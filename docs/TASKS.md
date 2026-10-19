@@ -138,7 +138,7 @@ Phases 0 to 5 give you a usable app (chat + routing + files + web search). Phase
 **Done when**
 - [ ] App reachable over HTTPS on the team domain
 - [ ] Backup restore tested once on a scratch instance
-- [ ] RUNBOOK.md written and followed once by someone other than the author
+- [ ] RUNBOOK.md written and followed once by someone other than the author *(written: `docs/RUNBOOK.md`; deploy files in `deploy/`. Backup format/restore commands checked locally against Postgres 16)*
 
 ---
 

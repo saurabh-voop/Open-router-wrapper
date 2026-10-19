@@ -1,0 +1,32 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RelayFiles",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::RELAY_BUCKET/*"
+    },
+    {
+      "Sid": "RelayBucketList",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::RELAY_BUCKET"
+    },
+    {
+      "Sid": "RelaySecrets",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParametersByPath", "ssm:GetParameters"],
+      "Resource": "arn:aws:ssm:ap-south-1:ACCOUNT_ID:parameter/relay/prod*"
+    },
+    {
+      "Sid": "KmsForS3AndSsm",
+      "Effect": "Allow",
+      "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {"kms:ViaService": ["s3.ap-south-1.amazonaws.com", "ssm.ap-south-1.amazonaws.com"]}
+      }
+    }
+  ]
+}

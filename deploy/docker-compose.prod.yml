@@ -1,0 +1,140 @@
+# Production stack on one EC2 instance (SPEC sections 3 and 10), region ap-south-1.
+#
+#   sudo /opt/relay/deploy/load-secrets.sh     # SSM Parameter Store -> /opt/relay/.env.production
+#   docker compose -f deploy/docker-compose.prod.yml --env-file /opt/relay/.env.production up -d --build
+#
+# Only Caddy publishes ports. Secrets come from SSM; nothing secret lives in the repo.
+# AWS access (S3, SSM, KMS) comes from the instance role, never from static keys.
+x-logging: &logging
+  driver: json-file
+  options: {max-size: "20m", max-file: "5"}
+
+x-relay-env: &relay-env
+  ENVIRONMENT: production
+  DATABASE_URL: postgresql+asyncpg://relay:${POSTGRES_PASSWORD}@db:5432/relay
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+  JWT_SECRET: ${JWT_SECRET}
+  FERNET_KEY: ${FERNET_KEY}
+  AWS_REGION: ap-south-1
+  S3_BUCKET: ${S3_BUCKET}
+  APP_BASE_URL: https://${RELAY_DOMAIN}
+  DEFAULT_MONTHLY_CAP_USD: ${DEFAULT_MONTHLY_CAP_USD:-50}
+  ROUTING_STRICT: "true"
+  ROUTING_CONFIG_PATH: /app/config/routing.yaml
+  CONNECTORS_CONFIG_PATH: /app/config/connectors.yaml
+  SANDBOX_URL: http://sandbox:8100
+  SANDBOX_TOKEN: ${SANDBOX_TOKEN}
+  CLAMAV_HOST: ${CLAMAV_HOST:-}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+
+services:
+  caddy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      RELAY_DOMAIN: ${RELAY_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web, api]
+    logging: *logging
+
+  db:
+    image: postgres:16.10-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: relay
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: relay
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relay"]
+      interval: 10s
+      retries: 10
+    logging: *logging
+
+  api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment: *relay-env
+    depends_on:
+      db: {condition: service_healthy}
+    logging: *logging
+
+  web:
+    build:
+      context: ../frontend
+      args:
+        API_INTERNAL_URL: http://api:8000
+    restart: unless-stopped
+    depends_on: [api]
+    logging: *logging
+
+  sandbox-runtime:
+    image: relay-sandbox-runtime:1
+    build: ../sandbox/runtime
+    entrypoint: ["python", "-c", "pass"]
+    network_mode: none
+    restart: "no"
+
+  sandbox-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      POST: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [sandbox_ctl]
+    logging: *logging
+
+  sandbox:
+    build: ../sandbox
+    restart: unless-stopped
+    environment:
+      DOCKER_HOST: tcp://sandbox-proxy:2375
+      SANDBOX_IMAGE: relay-sandbox-runtime:1
+      SANDBOX_TOKEN: ${SANDBOX_TOKEN}
+      SANDBOX_RUNTIME: ${SANDBOX_RUNTIME:-}
+    depends_on:
+      sandbox-proxy: {condition: service_started}
+      sandbox-runtime: {condition: service_completed_successfully}
+    networks: [default, sandbox_ctl]
+    logging: *logging
+
+  backup:
+    build: ./backup
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: relay
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: relay
+      S3_BUCKET: ${S3_BUCKET}
+      AWS_REGION: ap-south-1
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-21}  # runs at 21:30 UTC = 03:00 IST
+    depends_on:
+      db: {condition: service_healthy}
+    logging: *logging
+
+  # Optional virus scanning of uploads (needs ~1.5 GB RAM). Enable with
+  # `--profile scan` and CLAMAV_HOST=clamav in SSM.
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    profiles: [scan]
+    logging: *logging
+
+networks:
+  sandbox_ctl:
+    internal: true
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
