@@ -6,14 +6,18 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
-    "pydantic>=2.9",
+    "pydantic[email]>=2.9",
     "pydantic-settings>=2.6",
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30",
     "alembic>=1.14",
     "httpx>=0.28",
-    "openai>=1.55",
+    "openai>=2.54,<3",  # 3.x moved to httpx2, which respx cannot mock
     "pyyaml>=6.0",
+    "argon2-cffi>=25.1.0",
+    "pyjwt>=2.15.1",
+    "cryptography>=50.0.2",
+    "boto3>=1.43.114",
 ]
 
 [dependency-groups]
@@ -24,6 +28,8 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "types-pyyaml>=6.0",
+    "boto3-stubs[s3]>=1.43.114",
+    "moto[s3]>=5.2.4",
 ]
 
 [tool.uv]

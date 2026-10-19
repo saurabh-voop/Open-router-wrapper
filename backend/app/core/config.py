@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    catalog_sync_enabled: bool = True
 
     jwt_secret: str = Field(default="dev-insecure-change-me", min_length=16)
     jwt_expiry_days: int = 7

@@ -1,0 +1,44 @@
+# Test routing policy with fake slugs. Never used outside the test suite.
+version: 1
+classifier_model: "acme/fast-classifier"
+classifier_timeout_s: 3
+switch_threshold: 0.75
+max_tool_steps: 10
+context_safety_factor: 1.2
+default_category: general
+categories:
+  coding:
+    description: "Write, review, debug or explain code."
+    examples: ["Fix this endpoint"]
+    models: ["acme/coder", "acme/allround", "acme/vision-pro"]
+    tools: [run_python]
+  data_analysis:
+    description: "Analyse tables."
+    models: ["acme/coder", "acme/allround"]
+    tools: [run_python]
+  research:
+    description: "Current facts from the web."
+    models: ["acme/searcher", "acme/allround"]
+    tools: [web_search]
+  document_qa:
+    description: "Questions about a document."
+    models: ["acme/longdoc", "acme/allround"]
+    tools: []
+  writing:
+    description: "Emails, rewriting."
+    models: ["acme/writer", "acme/allround"]
+    tools: []
+  reasoning:
+    description: "Planning, maths."
+    models: ["acme/thinker", "acme/allround"]
+    tools: []
+  actions:
+    description: "Gmail, Drive, CRM."
+    models: ["acme/allround", "acme/coder"]
+    tools: [connectors]
+  general:
+    description: "Everything else."
+    models: ["acme/allround", "acme/writer"]
+    tools: []
+baseline_model: "acme/allround"
+judge_model: "acme/thinker"

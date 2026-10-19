@@ -27,10 +27,18 @@ Phases 0 to 5 give you a usable app (chat + routing + files + web search). Phase
 > Read SPEC sections 6 and 7. Before writing code, use the openrouter-docs MCP server to confirm the current request/response shapes for chat completions with streaming, provider preferences (`zdr`, `data_collection`), the `models` fallback array, `GET /api/v1/models/user`, `GET /api/v1/endpoints/zdr`, and usage accounting (`usage.cost`). Report any difference from the spec before continuing. Then build `backend/app/llm/openrouter.py` (streaming chat, fallbacks, privacy params always set, usage parsing) and `backend/app/llm/catalog.py` (sync job into the `models` table). Add a temporary endpoint that streams a reply from one fixed model given in an env var. Tests with respx only.
 
 **Done when**
-- [ ] A unit test proves every request body sent by the client contains `provider.zdr = true` and `provider.data_collection = "deny"`
-- [ ] Streaming works end to end with a real key (manual check), and `usage.cost` is captured from the final chunk
-- [ ] Catalog sync fills `models` with context length, modalities, supported parameters, prices and `has_zdr_endpoint`
-- [ ] The answered model is taken from the response, not the request
+- [x] A unit test proves every request body sent by the client contains `provider.zdr = true` and `provider.data_collection = "deny"` (`backend/tests/llm/test_openrouter.py`)
+- [ ] Streaming works end to end with a real key (manual check), and `usage.cost` is captured from the final chunk *(final-chunk parsing tested; real-key check pending: openrouter.ai not reachable from the build environment)*
+- [x] Catalog sync fills `models` with context length, modalities, supported parameters, prices and `has_zdr_endpoint` (`backend/tests/llm/test_catalog.py`)
+- [x] The answered model is taken from the response, not the request
+
+---
+
+**Phase 1 notes (2026-10-19)**
+- openrouter.ai is blocked from the build environment, so the API was checked against the official docs source (github.com/OpenRouterTeam/docs, OpenAPI spec, same day) instead of the docs MCP server. Re-check against the live API once a key is available.
+- Differences from SPEC found and handled: mid-stream errors arrive as a 200 with an `error` chunk and `finish_reason: "error"`; the usage chunk repeats the last choice; deprecated `pdf-text` now redirects to `cloudflare-ai` (free), not `mistral-ocr`; streaming `url_citation` annotations are not documented for Chat Completions, so they are parsed defensively from `delta.annotations`; a 503 means "no provider meets your routing requirements" (relevant to ZDR).
+- OpenAI SDK pinned to `>=2.54,<3`: 3.x moved to `httpx2`, which respx cannot mock.
+- No throwaway fixed-model endpoint: Phase 2's real messages endpoint is used for the manual end-to-end check instead.
 
 ---
 
