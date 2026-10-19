@@ -1,0 +1,354 @@
+# Seed eval set (TASKS Phase 4): 10 realistic prompts per category for an industrial
+# sales team (gensets, panels, AMC, tenders, client emails, CSV analysis, code).
+# The team should add at least 50 real prompts. Each item: id, category (the expected
+# category, used only for reporting), prompt. Data the prompt needs is inlined.
+version: 1
+prompts:
+  # ---------------------------------------------------------------- coding
+  - id: code-01
+    category: coding
+    prompt: "Write a Python function that parses Indian GST numbers (GSTIN), validates the format and checksum, and returns the state code. Include tests."
+  - id: code-02
+    category: coding
+    prompt: |
+      This FastAPI endpoint returns 422 when the frontend posts the form. Why, and how do I fix it?
+      ```python
+      @app.post("/quotes")
+      async def create_quote(customer: str, kva: int, qty: int):
+          return {"total": kva * qty * 1850}
+      ```
+      The frontend sends JSON: {"customer": "Hindalco", "kva": 500, "qty": 2}
+  - id: code-03
+    category: coding
+    prompt: "Write a PostgreSQL query that gives monthly revenue per customer for the last 12 months from tables invoices(id, customer_id, issued_on date, amount numeric) and customers(id, name), including months with zero revenue."
+  - id: code-04
+    category: coding
+    prompt: "Give me a regex that matches our quotation numbers like PK/Q/2026-27/0457 and PK/Q/2025-26/12, and captures the financial year and the sequence number. Explain each part."
+  - id: code-05
+    category: coding
+    prompt: "Write a Google Apps Script that runs daily, finds rows in the 'AMC' sheet where the renewal date is within 30 days, and emails a summary to sales@ourcompany.in."
+  - id: code-06
+    category: coding
+    prompt: "Review this code for bugs and security problems:\n```python\ndef get_tender(request):\n    tid = request.GET['id']\n    rows = db.execute(f\"SELECT * FROM tenders WHERE id = {tid}\")\n    return render(request, 'tender.html', {'t': rows[0]})\n```"
+  - id: code-07
+    category: coding
+    prompt: "Write a bash script that backs up a Postgres database to a gzipped file named with today's date, keeps the last 14 backups, and uploads the newest to an S3 bucket."
+  - id: code-08
+    category: coding
+    prompt: "Explain the difference between asyncio.gather and asyncio.TaskGroup in Python 3.12, with an example where they behave differently on errors."
+  - id: code-09
+    category: coding
+    prompt: "Convert this Excel formula to pandas: =SUMIFS(D:D, A:A, \"Pune\", C:C, \">=\"&DATE(2026,4,1)) where A is branch, C is invoice date, D is amount."
+  - id: code-10
+    category: coding
+    prompt: "Write a TypeScript type and a zod schema for a genset quotation line item: model, kVA rating (15 to 3000), fuel type (diesel/gas/dual), quantity, unit price in INR, optional AMC years (1-5)."
+
+  # ---------------------------------------------------------------- data_analysis
+  - id: data-01
+    category: data_analysis
+    prompt: |
+      Which customers grew the most from Q1 to Q2? Give growth in % and absolute terms.
+      customer,q1_inr,q2_inr
+      Hindalco,1250000,1810000
+      Tata Motors,980000,910000
+      Bharat Forge,450000,790000
+      Thermax,1300000,1340000
+      Kirloskar,220000,610000
+  - id: data-02
+    category: data_analysis
+    prompt: |
+      Compute monthly genset units sold and the month-over-month change, and tell me the best and worst months.
+      month,units
+      2026-04,18
+      2026-05,22
+      2026-06,15
+      2026-07,27
+      2026-08,31
+      2026-09,24
+  - id: data-03
+    category: data_analysis
+    prompt: |
+      Our AMC contracts: what is the renewal rate by region, and which region should we focus on?
+      region,contracts_due,renewed
+      North,40,31
+      West,55,49
+      South,38,22
+      East,21,17
+  - id: data-04
+    category: data_analysis
+    prompt: "We quote a 500 kVA genset at INR 38.5 lakh with 18% GST and a 4% dealer margin built into the base price. A customer asks for 7% discount on the base. What is our new margin in rupees and as % of the discounted base, and the final invoice value?"
+  - id: data-05
+    category: data_analysis
+    prompt: |
+      Find anomalies in these daily diesel consumption readings (litres) for a 750 kVA site and explain them.
+      day,litres,run_hours
+      1,412,8
+      2,398,8
+      3,405,8
+      4,690,8
+      5,401,8
+      6,0,8
+      7,410,8
+  - id: data-06
+    category: data_analysis
+    prompt: |
+      Build a simple forecast for next quarter's panel orders from this history and state your assumptions.
+      quarter,orders
+      2025-Q1,34
+      2025-Q2,41
+      2025-Q3,39
+      2025-Q4,47
+      2026-Q1,52
+      2026-Q2,58
+  - id: data-07
+    category: data_analysis
+    prompt: |
+      Rank our sales reps by conversion rate and by average deal size; who needs coaching?
+      rep,leads,won,won_value_inr
+      Amit,60,12,5400000
+      Priya,45,15,4100000
+      Rahul,80,10,9800000
+      Sneha,30,9,2100000
+  - id: data-08
+    category: data_analysis
+    prompt: "A tender has 3 bids: A INR 2.41 cr (technical score 78), B INR 2.18 cr (score 71), C INR 2.65 cr (score 88). Evaluation is QCBS 70:30 (technical:financial), financial score = lowest bid / bid x 100. Who wins? Show the calculation."
+  - id: data-09
+    category: data_analysis
+    prompt: |
+      Summarise outstanding receivables by ageing bucket (0-30, 31-60, 61-90, 90+ days) as of 2026-10-15.
+      invoice,customer,due_date,amount_inr
+      1001,Hindalco,2026-10-01,450000
+      1002,Thermax,2026-08-20,1200000
+      1003,Kirloskar,2026-06-30,300000
+      1004,Tata Motors,2026-09-10,780000
+      1005,Hindalco,2026-07-15,210000
+  - id: data-10
+    category: data_analysis
+    prompt: "If a 1000 kVA genset runs at 75% load for 10 hours a day and consumes 0.21 litres per kWh at that load, how much diesel per month (30 days), and the monthly cost at INR 92.4 per litre? Assume power factor 0.8."
+
+  # ---------------------------------------------------------------- research
+  - id: research-01
+    category: research
+    prompt: "What are the current CPCB IV+ emission norms for diesel gensets in India and when did they take effect for different kVA ranges?"
+  - id: research-02
+    category: research
+    prompt: "What is the current retail diesel price in Pune and Mumbai?"
+  - id: research-03
+    category: research
+    prompt: "What did Cummins India announce in its most recent quarterly results?"
+  - id: research-04
+    category: research
+    prompt: "List the major data-centre projects announced in Maharashtra in the last six months and who is building them."
+  - id: research-05
+    category: research
+    prompt: "What are the latest BIS or CEA rules for LT electrical panels (IS/IEC 61439) that a panel builder in India must follow?"
+  - id: research-06
+    category: research
+    prompt: "Which companies won the most recent large genset tenders from Indian Railways or metro rail corporations?"
+  - id: research-07
+    category: research
+    prompt: "What is the current copper price trend and how might it affect switchgear and panel pricing this quarter?"
+  - id: research-08
+    category: research
+    prompt: "Has GeM (Government e-Marketplace) changed its rules for EMD or performance bank guarantees for MSME sellers this year?"
+  - id: research-09
+    category: research
+    prompt: "Who are the main competitors to Kirloskar in the 500 to 1000 kVA genset segment in India today, and how are they positioned?"
+  - id: research-10
+    category: research
+    prompt: "Are there any current state subsidies or incentives in Maharashtra for gas-based or hybrid gensets for industrial users?"
+
+  # ---------------------------------------------------------------- document_qa
+  - id: doc-01
+    category: document_qa
+    prompt: |
+      From this tender extract, list every deadline and the payment terms.
+      ---
+      Last date for pre-bid queries: 28.10.2026, 17:00 hrs. Pre-bid meeting: 30.10.2026 at 11:00 hrs, Pune office.
+      Bid submission: 12.11.2026 by 15:00 hrs on the e-procurement portal. Technical bid opening: 13.11.2026 at 11:00 hrs.
+      Payment: 70% against delivery and inspection, 20% after successful commissioning, 10% after the defect liability period of 12 months, against an equivalent bank guarantee it may be released earlier.
+      EMD: INR 2,50,000 via BG valid for 180 days from bid due date.
+  - id: doc-02
+    category: document_qa
+    prompt: |
+      Does this AMC clause make us liable for consumables? Answer yes/no and quote the relevant text.
+      ---
+      4.2 The Contractor shall carry out preventive maintenance every 250 running hours or quarterly, whichever is earlier. 4.3 Lubricating oil, filters and coolant required for preventive maintenance shall be supplied by the Contractor at no extra cost. 4.4 Spares other than those listed in Annexure B shall be charged at actuals with a 10% handling charge.
+  - id: doc-03
+    category: document_qa
+    prompt: |
+      Summarise the warranty terms in 3 bullet points and flag anything unusual.
+      ---
+      Warranty: 24 months from date of commissioning or 30 months from date of supply, whichever is earlier, or 5000 running hours, whichever occurs first. Warranty excludes damage due to poor fuel quality, overloading beyond 110% for more than 1 hour in 12, and civil works. The Purchaser's decision on the cause of failure shall be final.
+  - id: doc-04
+    category: document_qa
+    prompt: |
+      Compare these two quotations and tell me which is better value for a 625 kVA requirement.
+      ---
+      Quote A: 625 kVA, CPCB IV+, acoustic enclosure, AMF panel, INR 54.2 lakh ex-works, freight extra, 18 months warranty, delivery 8 weeks.
+      Quote B: 600 kVA, CPCB IV+, acoustic enclosure, AMF panel + synchronising, INR 52.9 lakh FOR site, 24 months warranty, delivery 12 weeks.
+  - id: doc-05
+    category: document_qa
+    prompt: |
+      Extract the technical specification as a table (parameter, value).
+      ---
+      The DG set shall be rated 1010 kVA prime power at 415 V, 3 phase, 50 Hz, 0.8 PF, 1500 RPM, with a 4-pole brushless alternator of class H insulation, temperature rise limited to class F. Fuel tank: 990 litres integral. Noise: 75 dB(A) at 1 m. Controller: microprocessor-based with remote monitoring over Modbus RS485.
+  - id: doc-06
+    category: document_qa
+    prompt: |
+      What are the penalties in this contract and what is our maximum exposure on a INR 1.8 cr order?
+      ---
+      LD for delay: 0.5% of order value per week of delay, max 10%. Performance shortfall: if fuel consumption at 75% load exceeds the guaranteed value by more than 5%, a penalty of INR 1,00,000 per 1% excess applies, capped at 5% of order value. Availability below 98% in any quarter attracts a penalty of 2% of the quarterly AMC fee per 1% shortfall.
+  - id: doc-07
+    category: document_qa
+    prompt: |
+      Is anything in this purchase order inconsistent with our quotation?
+      ---
+      Our quote: 2 x 380 kVA, INR 28.4 lakh each, delivery 6 weeks, payment 30% advance, 70% before dispatch.
+      PO: 2 x 380 kVA, INR 28.4 lakh each, delivery 4 weeks, payment 10% advance, 90% within 60 days of commissioning, LD 1% per week.
+  - id: doc-08
+    category: document_qa
+    prompt: |
+      List the documents we must submit with this bid.
+      ---
+      The bidder shall submit: (i) PAN and GST registration; (ii) audited balance sheets for the last three financial years showing average annual turnover not less than INR 5 crore; (iii) at least two completion certificates for similar works of 500 kVA or above in the last five years; (iv) OEM authorisation letter; (v) EMD BG; (vi) signed integrity pact; (vii) MSME certificate, if claiming exemption.
+  - id: doc-09
+    category: document_qa
+    prompt: |
+      Explain this force majeure clause in plain English and say whether it covers a supplier's engine shortage.
+      ---
+      Neither party shall be liable for failure to perform due to causes beyond its reasonable control, including acts of God, war, epidemic, government action, or strikes not limited to the affected party's own workforce, provided notice is given within 7 days. Shortage of materials or components shall not constitute force majeure unless caused by one of the foregoing events.
+  - id: doc-10
+    category: document_qa
+    prompt: |
+      Pull out all the contact people and their roles from this email thread.
+      ---
+      From: R. Deshmukh (Procurement Head, Thermax) - "Please coordinate with Ms. Anjali Rao, our site engineer at Chakan, for the delivery schedule. Accounts queries go to Mr. Vikas Jain (Finance)." Reply from: Neha Kulkarni (Sales Coordinator, our side) - "Copying our service lead Sanjay Pawar who will handle commissioning."
+
+  # ---------------------------------------------------------------- writing
+  - id: write-01
+    category: writing
+    prompt: "Write a polite but firm follow-up email to Hindalco's procurement team: our quotation for 2 x 750 kVA gensets was sent 3 weeks ago and the validity expires on 31 October. Keep it under 150 words."
+  - id: write-02
+    category: writing
+    prompt: "Rewrite this to sound more professional: 'hi sir, we will send the panel next week only because material is late from vendor. sorry for trouble. pls adjust.'"
+  - id: write-03
+    category: writing
+    prompt: "Translate into Marathi, keeping technical terms in English: 'The generator will be serviced on Saturday between 10 am and 2 pm. Please ensure the site is accessible and the load is shifted to mains.'"
+  - id: write-04
+    category: writing
+    prompt: "Draft a one-page proposal introduction for an AMC offering to a hospital with 3 gensets (500, 500, 250 kVA): emphasise uptime, 4-hour response, and monthly reports."
+  - id: write-05
+    category: writing
+    prompt: "Write a LinkedIn post (about 120 words) announcing that we commissioned a 2 MW synchronised genset system for a data centre in Pune. Professional, not salesy."
+  - id: write-06
+    category: writing
+    prompt: "A customer is angry that our technician arrived 6 hours late during an outage. Write an apology email that takes responsibility, explains the corrective steps, and offers a goodwill gesture."
+  - id: write-07
+    category: writing
+    prompt: "Make this email shorter and more direct: 'Dear Sir, I hope this email finds you well. As discussed in our telephonic conversation earlier this week, I am writing to kindly request you to please share the updated load list for the new plant at your earliest convenience so that our engineering team can proceed with the sizing of the generator set, which is required for us to finalise the quotation.'"
+  - id: write-08
+    category: writing
+    prompt: "Translate into Hindi for a customer WhatsApp message: 'Your AMC is due for renewal on 15 November. Renew before 31 October to get 5% off and a free load bank test.'"
+  - id: write-09
+    category: writing
+    prompt: "Write a short internal note to the sales team explaining the new rule: discounts above 5% need the regional manager's approval in the CRM before the quote is sent."
+  - id: write-10
+    category: writing
+    prompt: "Draft a reply declining a customer's request for 90-day credit, offering 30 days instead with a 1% early-payment discount. Keep the relationship warm."
+
+  # ---------------------------------------------------------------- reasoning
+  - id: reason-01
+    category: reasoning
+    prompt: "Plan a 6-week rollout for a new AMC offering across 4 regional offices: week-by-week steps, owners, and the key risks."
+  - id: reason-02
+    category: reasoning
+    prompt: "Is this pricing model profitable? We sell AMC at INR 85,000 per genset per year. Each genset needs 4 visits (INR 6,500 each incl. travel), consumables INR 18,000, and on average INR 22,000 of breakdown support. Overheads are 12% of revenue. At 40 contracts, what is our profit and margin? What price gives 25% margin?"
+  - id: reason-03
+    category: reasoning
+    prompt: "A customer needs backup for a 420 kW load with a 150 kW motor that starts direct-on-line. How would you size the genset? Walk through the reasoning and state assumptions."
+  - id: reason-04
+    category: reasoning
+    prompt: "We can either hire 2 more service technicians (INR 6 lakh/year each) or outsource overflow jobs at INR 9,000 per visit. We expect 180 overflow visits next year with 30% uncertainty. Which is better and when does the decision flip?"
+  - id: reason-05
+    category: reasoning
+    prompt: "Should we bid on a government tender with 0.5% weekly LD (max 10%), 90-day payment terms, and a 12% expected margin, given our working capital cost is 11% per year? Lay out the trade-offs."
+  - id: reason-06
+    category: reasoning
+    prompt: "Three customers want delivery in the same week but we can only deliver two gensets. Customer A: repeat client, INR 40 lakh, LD 1%/week. Customer B: new, INR 55 lakh, no LD. Customer C: government, INR 35 lakh, LD 0.5%/week, payment in 90 days. How do we prioritise?"
+  - id: reason-07
+    category: reasoning
+    prompt: "Design a simple lead-scoring scheme (0-100) for our genset enquiries using information we usually have at first contact. Explain the weights."
+  - id: reason-08
+    category: reasoning
+    prompt: "If our win rate is 22% and average deal size INR 31 lakh, how many qualified leads per month do we need to hit INR 2.5 cr monthly bookings? How would improving win rate to 27% change that?"
+  - id: reason-09
+    category: reasoning
+    prompt: "What questions should a salesperson ask on a first site visit for a data-centre backup power requirement? Group them by topic."
+  - id: reason-10
+    category: reasoning
+    prompt: "A hospital asks whether to buy one 1000 kVA genset or two 500 kVA in parallel. Give a balanced recommendation covering reliability, cost, maintenance and space."
+
+  # ---------------------------------------------------------------- actions
+  - id: act-01
+    category: actions
+    prompt: "Find the last email from the Hindalco procurement team and summarise what they asked for."
+  - id: act-02
+    category: actions
+    prompt: "Save this proposal to the Clients/Thermax folder in Drive."
+  - id: act-03
+    category: actions
+    prompt: "Draft a reply to the latest email from Kirloskar about the delivery schedule, but don't send it."
+  - id: act-04
+    category: actions
+    prompt: "Search my Drive for the AMC rate card and tell me the price for a 500 kVA genset."
+  - id: act-05
+    category: actions
+    prompt: "List all emails from this week that mention 'tender' and have attachments."
+  - id: act-06
+    category: actions
+    prompt: "Send the commissioning report PDF from my Drive to anjali.rao@thermax.example."
+  - id: act-07
+    category: actions
+    prompt: "Which customer emails in the last 7 days have I not replied to?"
+  - id: act-08
+    category: actions
+    prompt: "Create a Google Doc in the Proposals folder titled 'Hospital AMC proposal - draft' with the outline we discussed."
+  - id: act-09
+    category: actions
+    prompt: "Find the PO from Tata Motors in my email and check the delivery date."
+  - id: act-10
+    category: actions
+    prompt: "Open the latest 'Monthly sales' sheet in Drive and tell me this month's total."
+
+  # ---------------------------------------------------------------- general
+  - id: gen-01
+    category: general
+    prompt: "What does AMC mean in the genset business?"
+  - id: gen-02
+    category: general
+    prompt: "What is the difference between kVA and kW?"
+  - id: gen-03
+    category: general
+    prompt: "What is an AMF panel?"
+  - id: gen-04
+    category: general
+    prompt: "Explain prime power vs standby power ratings for a genset in two sentences."
+  - id: gen-05
+    category: general
+    prompt: "What does EMD stand for in tenders?"
+  - id: gen-06
+    category: general
+    prompt: "Good morning! Any tips for staying focused during long tender documentation days?"
+  - id: gen-07
+    category: general
+    prompt: "What is a synchronising panel used for?"
+  - id: gen-08
+    category: general
+    prompt: "How many lakh are in a crore?"
+  - id: gen-09
+    category: general
+    prompt: "What is CPCB?"
+  - id: gen-10
+    category: general
+    prompt: "What's the difference between a quotation and a proforma invoice?"

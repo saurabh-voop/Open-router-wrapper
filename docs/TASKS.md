@@ -74,7 +74,7 @@ Phases 0 to 5 give you a usable app (chat + routing + files + web search). Phase
 > Read SPEC sections 2 and 15. Build `backend/evals/`: a YAML set of prompts (I will add real team prompts; seed it with 10 realistic ones per category for an industrial sales team: gensets, panels, AMC, tenders, client emails, CSV analysis, code), a runner that sends each prompt through (a) the router and (b) `baseline_model` only, and a pairwise LLM judge (judge model from config, ZDR, randomised answer order, asks which answer is better or tie, with a short reason). Output a markdown report: win/tie/loss per category, cost per category, and the 10 largest losses with both answers. Make it a CLI: `uv run python -m evals.run --set evals/prompts.yaml`.
 
 **Done when**
-- [ ] Report generated for the seed set
+- [ ] Report generated for the seed set *(harness, 80-prompt seed set and mocked test are in `backend/evals/`; a real run needs the OpenRouter key and real slugs in routing.yaml)*
 - [ ] Team has added at least 50 real prompts and the report is re-run
 - [ ] Decision recorded in this file: keep routing, adjust `routing.yaml`, or set all categories to the baseline model
 - [ ] At least 20 report items spot-checked by a person (LLM judges have biases)
