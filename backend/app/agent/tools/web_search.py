@@ -25,7 +25,10 @@ def citations_from_annotations(annotations: list[dict[str, Any]]) -> list[dict[s
             continue
         cite = ann.get("url_citation") or {}
         url = cite.get("url")
-        if not url or url in seen:
+        # Only web links: the URL comes from model/search output and is rendered as a link.
+        if not isinstance(url, str) or not url.lower().startswith(("https://", "http://")):
+            continue
+        if url in seen:
             continue
         seen[url] = {"index": len(seen) + 1, "url": url, "title": cite.get("title") or url}
     return list(seen.values())

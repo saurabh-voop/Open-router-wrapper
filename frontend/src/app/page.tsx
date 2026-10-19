@@ -1,10 +1,13 @@
+import { Suspense } from "react";
+import { ChatPage } from "@/components/chat/ChatPage";
+import { FullPageLoading } from "@/components/FullPageLoading";
+
 export default function Home() {
+  // The selected conversation lives in ?c=<id>; search params are request-time
+  // data, so the client shell renders inside Suspense (cacheComponents).
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-3xl font-semibold">Relay</h1>
-        <p className="mt-2 text-neutral-500">Team chat with automatic model routing.</p>
-      </div>
-    </main>
+    <Suspense fallback={<FullPageLoading />}>
+      <ChatPage />
+    </Suspense>
   );
 }

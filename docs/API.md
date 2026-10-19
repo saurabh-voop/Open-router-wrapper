@@ -70,7 +70,7 @@ A 409 before the stream starts means an answer is still running, or an approval 
 | `file` | `attachment_id, filename, mime` | Output file; images render inline from `GET /files/{attachment_id}` |
 | `approval_required` | `tool_run_id, tool, input` | Show an Approve/Reject card; the stream then ends with `done {paused: true}` |
 | `citation` | `index, url, title` | Numbered source under the answer |
-| `usage` | `cost_usd, prompt_tokens, completion_tokens, month_spend_usd, monthly_cap_usd, budget_warning` | Update the header spend |
+| `usage` | `cost_usd, prompt_tokens, completion_tokens, month_spend_usd, monthly_cap_usd, budget_warning, budget_exceeded` | Update the header spend |
 | `error` | `message, message_id?` | Show in place of, or under, the answer |
 | `done` | `message_id, paused?` | Stream finished |
 

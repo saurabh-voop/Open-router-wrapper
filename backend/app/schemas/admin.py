@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
+from app.schemas.auth import UserOut
+
 
 class CreateUserRequest(BaseModel):
     email: EmailStr
@@ -18,3 +20,7 @@ class UpdateUserRequest(BaseModel):
     monthly_cap_usd: Decimal | None = Field(default=None, ge=0)
     is_active: bool | None = None
     password: str | None = Field(default=None, min_length=12, max_length=1024)
+
+
+class AdminUserOut(UserOut):
+    month_spend_usd: Decimal

@@ -574,6 +574,7 @@ class Turn:
                 "month_spend_usd": str(status.spent),
                 "monthly_cap_usd": str(status.cap),
                 "budget_warning": status.warn,
+                "budget_exceeded": status.exceeded,
             }
         )
 
