@@ -48,10 +48,10 @@ Phases 0 to 5 give you a usable app (chat + routing + files + web search). Phase
 > Read SPEC sections 10, 12 and 13. Implement email/password auth (argon2, JWT in httpOnly cookie, login rate limit, admin-only user creation with a CLI command to create the first admin), conversations and messages CRUD, and `POST /conversations/{id}/messages` as an SSE stream still using the fixed model from Phase 1. Build the frontend: login page, conversation list, thread with markdown + code highlighting, streaming input, model badge on each answer. Every endpoint gets a cross-user access test.
 
 **Done when**
-- [ ] Two users cannot see each other's conversations (tests)
-- [ ] Chat streams in the browser and survives a page reload (history loads from DB)
-- [ ] Each assistant message stores model, tokens, cached tokens and cost
-- [ ] Badge shows the model that answered
+- [x] Two users cannot see each other's conversations (tests: `backend/tests/api/test_isolation.py`)
+- [ ] Chat streams in the browser and survives a page reload (history loads from DB) *(API tested; UI covered by Playwright with a mocked API; real-browser check against a live backend pending the OpenRouter key)*
+- [x] Each assistant message stores model, tokens, cached tokens and cost
+- [x] Badge shows the model that answered
 
 ---
 
@@ -61,10 +61,10 @@ Phases 0 to 5 give you a usable app (chat + routing + files + web search). Phase
 > Read SPEC section 5 and section 2 carefully. First, fill `config/routing.yaml`: query the live catalog (`/api/v1/models/user` + `/api/v1/endpoints/zdr`), propose a quality-first model list for each category and for `classifier_model` and `baseline_model`, with one line of reasoning each, and show me the proposal before writing it. Then implement `backend/app/router/` exactly as specified: hard capability filter, deterministic pre-rules, classifier with strict JSON and 3 s timeout, sticky switching with the threshold, policy lookup with fallbacks, `RoutingDecision` persisted to `routing_decisions`, and the SSE `route` event. Write the tests first, including: follow-up keeps the model; low-confidence category change keeps the model; image attachment forces a switch to a vision model; locked model is respected; filter failure gives a clear error; classifier timeout keeps the current model. Add the UI pieces: route notice in the thread, "Re-run with…", "Lock this chat", thumbs up/down, all logged.
 
 **Done when**
-- [ ] `routing.yaml` has real slugs, all present in the catalog with ZDR endpoints; the app refuses to start otherwise
-- [ ] All router tests above pass
-- [ ] Router overhead (filter + classifier) p50 under 800 ms in manual testing
-- [ ] Overrides, regenerations and thumbs are written to `routing_decisions` / `feedback`
+- [ ] `routing.yaml` has real slugs, all present in the catalog with ZDR endpoints; the app refuses to start otherwise *(refusal implemented and tested (`ROUTING_STRICT`, always on in production); filling the slugs needs live catalog access)*
+- [x] All router tests above pass (`backend/tests/router/test_router.py`)
+- [ ] Router overhead (filter + classifier) p50 under 800 ms in manual testing *(`classifier_latency_ms` is logged per decision and shown on Admin → Routing; needs live testing)*
+- [x] Overrides, regenerations and thumbs are written to `routing_decisions` / `feedback`
 
 ---
 
@@ -87,10 +87,10 @@ Phases 0 to 5 give you a usable app (chat + routing + files + web search). Phase
 > Read SPEC sections 8.1, 8.2 and 10. Confirm current details with the openrouter-docs MCP server (file content parts and file-parser engines; the `openrouter:web_search` server tool parameters and `url_citation` annotations) before coding. Implement uploads to S3 (use LocalStack or MinIO in docker-compose for dev), attachment token estimation, sending PDFs as `file` parts and images as `image_url` parts, inlining text files, the web search server tool for the `research` category or when the user toggles it, citation rendering, and the confidential toggle (default on when a conversation has an attachment; disables web search). Feed attachment needs into the router's hard filter.
 
 **Done when**
-- [ ] A 50-page PDF can be asked about; router picks a model with enough context and file support
-- [ ] Web search answers show numbered citations
-- [ ] Confidential conversations never include the web search tool (test)
-- [ ] Deleting a conversation deletes its S3 objects (test)
+- [x] A 50-page PDF can be asked about; router picks a model with enough context and file support (test, mocked models)
+- [x] Web search answers show numbered citations
+- [x] Confidential conversations never include the web search tool (test)
+- [x] Deleting a conversation deletes its S3 objects (test)
 
 ---
 
@@ -100,9 +100,9 @@ Phases 0 to 5 give you a usable app (chat + routing + files + web search). Phase
 > Read SPEC section 8.3. Build `sandbox/`: a small service that accepts a job (code + list of attachment keys), starts a fresh container from a pinned image (python, pandas, numpy, matplotlib, openpyxl) with no network, 60 s timeout, 1 CPU, 1 GB RAM, 100 MB disk, read-only root, non-root user, attachments mounted read-only at /data, writable /output. Use gVisor if available. Add the `run_python` function tool to the agent loop (max 10 steps, `tool_start`/`tool_end` events), store /output files in S3 and show them in the thread. Write security tests: network access fails, writing outside /output fails, infinite loop is killed, fork bomb is contained.
 
 **Done when**
-- [ ] "Plot monthly totals from this CSV" returns a chart in the chat
-- [ ] All four security tests pass
-- [ ] The model never switches during a tool loop (test)
+- [x] "Plot monthly totals from this CSV" returns a chart in the chat (API test with mocked sandbox; real chart generation tested in `sandbox/tests`)
+- [x] All four security tests pass (plus memory limit and non-root/no-capabilities; run against real containers, and in CI)
+- [x] The model never switches during a tool loop (test)
 
 ---
 
@@ -112,9 +112,9 @@ Phases 0 to 5 give you a usable app (chat + routing + files + web search). Phase
 > Read SPEC sections 11 and 13 (admin pages). Implement per-user monthly caps: pre-call check, re-check after each tool step, ledger updates from `usage.cost`, 80% warning in the UI, spend in the header. Admin pages: users and caps, spend per user per month, spend per model, recent routing decisions with overrides highlighted, and the catalog warnings from SPEC section 7.
 
 **Done when**
-- [ ] A user at their cap is blocked with a clear message (test)
-- [ ] A tool loop stops when the cap is crossed mid-loop (test)
-- [ ] Admin can raise a cap and the user can continue immediately
+- [x] A user at their cap is blocked with a clear message (test)
+- [x] A tool loop stops when the cap is crossed mid-loop (test)
+- [x] Admin can raise a cap and the user can continue immediately (test)
 
 ---
 

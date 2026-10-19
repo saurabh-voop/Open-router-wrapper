@@ -18,28 +18,36 @@ Self-hosted team chat that routes each message to the best OpenRouter model for 
 
 ```
 backend/app/
-  api/          # FastAPI routers (auth, conversations, messages, files, admin)
+  api/          # FastAPI routers (auth, conversations, messages, files, connectors, admin)
   core/         # settings, security, db session
   llm/          # openrouter.py (ONLY place that calls OpenRouter), catalog.py
-  router/       # filter.py, classifier.py, policy.py, sticky.py, decision.py
-  agent/        # loop.py, tools/ (web_search.py, run_python.py, connectors.py)
+  router/       # config.py, filter.py, classifier.py, policy.py, sticky.py, decision.py
+  agent/        # turn.py (one chat turn), history.py, stream.py (SSE), tools/
+  agent/tools/  # web_search.py, run_python.py, connectors.py (MCP), registry.py
+  services/     # budget, files (S3), attachments, oauth, virus_scan
   models/       # SQLAlchemy models
   schemas/      # Pydantic schemas
+backend/evals/  # router vs. baseline eval harness
 backend/tests/
-frontend/
-sandbox/        # code-execution service
+frontend/       # Next.js app; e2e/ has Playwright smoke tests (API mocked)
+sandbox/        # code-execution service; runtime/ is the per-job image
 config/         # routing.yaml, connectors.yaml
+deploy/         # production compose, Caddyfile, SSM loader, backups, AWS bootstrap
 docs/
 ```
 
 ## Commands
 
 ```bash
-docker compose up -d db                      # start Postgres
+docker compose up -d db s3                   # Postgres + local S3 (moto)
 cd backend && uv run alembic upgrade head    # migrate
-cd backend && uv run pytest -q               # backend tests
-cd backend && uv run ruff check . && uv run mypy app
+cd backend && uv run pytest -q               # backend tests (needs a relay_test DB)
+cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy app tests evals
+cd backend && uv run python -m app.cli create-admin --email you@x.com --name "You"
+cd backend && uv run python -m evals.run --set evals/prompts.yaml   # router vs baseline eval
+cd sandbox && uv run pytest -q               # security tests need: docker build -t relay-sandbox-runtime:1 sandbox/runtime
 cd frontend && npm run dev                   # UI on :3000
+cd frontend && npm run lint && npm run typecheck && npm run build && npm run test:e2e
 docker compose up --build                    # everything
 ```
 
@@ -76,13 +84,4 @@ This writes `.mcp.json` so the whole team gets the OpenRouter docs server.
 
 ## Environment variables
 
-```
-OPENROUTER_API_KEY=
-DATABASE_URL=postgresql+asyncpg://relay:relay@db:5432/relay
-JWT_SECRET=
-FERNET_KEY=                 # encrypts OAuth refresh tokens
-AWS_REGION=ap-south-1
-S3_BUCKET=
-DEFAULT_MONTHLY_CAP_USD=50
-APP_BASE_URL=http://localhost:3000
-```
+See `.env.example` (kept up to date). Production values come from SSM Parameter Store (`docs/RUNBOOK.md`).

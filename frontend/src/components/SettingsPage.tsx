@@ -48,6 +48,7 @@ const GOOGLE_FALLBACK: Connector = { id: "google", name: "Google (Gmail + Drive)
 function Connectors() {
   const params = useSearchParams();
   const justConnected = params.get("connected");
+  const callbackError = params.get("error");
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -123,6 +124,11 @@ function Connectors() {
           <button type="button" className="text-xs underline" onClick={() => setDismissed(true)}>
             Dismiss
           </button>
+        </div>
+      )}
+      {callbackError && !dismissed && (
+        <div className="mb-3">
+          <ErrorText>Google connection failed: {callbackError}</ErrorText>
         </div>
       )}
       {actionError && (
