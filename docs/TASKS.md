@@ -124,9 +124,9 @@ Phases 0 to 5 give you a usable app (chat + routing + files + web search). Phase
 > Read SPEC section 8.4. Implement the MCP client in `backend/app/agent/tools/connectors.py` driven by `config/connectors.yaml`. Start with Google Drive (read-only), then Gmail (read, then draft, then send). Implement per-user Google OAuth with encrypted refresh tokens. Mark each tool read or write; write tools pause the loop with an `approval_required` event and an Approve/Reject card in the UI. Find current, maintained MCP servers for Gmail and Drive and show me the options with their permissions before choosing. CRM comes later once we decide which CRM.
 
 **Done when**
-- [ ] "Find the last email from <client>" works for a connected user
-- [ ] Sending an email always shows an approval card; rejecting it sends nothing (test)
-- [ ] Revoking Google access in the UI deletes the stored token
+- [ ] "Find the last email from <client>" works for a connected user *(tested end to end with an in-process fake MCP server; live check needs the Google OAuth client)*
+- [x] Sending an email always shows an approval card; rejecting it sends nothing (test: `backend/tests/api/test_connectors.py`)
+- [x] Revoking Google access in the UI deletes the stored token (test)
 
 ---
 
@@ -155,4 +155,7 @@ Record decisions made during the build here (date, decision, why).
 - 2026-10-19: Sandbox uses a docker-socket-proxy that only allows container create/start/wait/logs/remove, never the raw socket (owner's call).
 - 2026-10-19: Budgets allow parallel requests per user; overshoot is bounded by the number of concurrent requests, accepted for a 2-5 person team (owner's call).
 - 2026-10-19: Gmail/Drive MCP servers: Claude picks and documents the choice in `docs/CONNECTORS.md`; swappable via `config/connectors.yaml` (owner's call).
+- 2026-10-19: Gmail/Drive connector: taylorwilsdon/google_workspace_mcp in external-OAuth stateless mode, pinned commit, plus Relay's own read/write allowlist. Reasoning and alternatives in `docs/CONNECTORS.md`.
+- 2026-10-19: Dev S3 uses moto's S3 server (MinIO no longer publishes community images reachable from here).
+- 2026-10-19: Sandbox inputs are copied into the job container through the Docker archive API, not bind mounts, because the sandbox service itself runs in a container.
 

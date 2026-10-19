@@ -1,0 +1,41 @@
+# Connectors (SPEC section 8.4). Relay is the MCP client; each entry is an MCP server.
+# Choice of server and the reasoning: docs/CONNECTORS.md.
+#
+# Every tool Relay may offer is listed here as read or write. Tools the server exposes
+# but this file does not list are never offered to the model, so a server upgrade cannot
+# silently add capabilities. Write tools always pause for the user's approval.
+#
+# `scopes` is what Relay asks Google for. The scopes are the real security boundary:
+# even a mis-listed tool fails without the scope. Roll out in stages by editing this list:
+#   1. drive.readonly   2. + gmail.readonly   3. + gmail.compose   4. + gmail.send
+# Users must reconnect Google after scopes are added.
+version: 1
+servers:
+  google_workspace:
+    name: "Google (Gmail and Drive)"
+    provider: google
+    # taylorwilsdon/google_workspace_mcp, external-OAuth stateless mode, internal network only.
+    url: "http://workspace-mcp:8000/mcp"
+    scopes:
+      - openid
+      - email
+      - https://www.googleapis.com/auth/drive.readonly
+      - https://www.googleapis.com/auth/gmail.readonly
+      - https://www.googleapis.com/auth/gmail.compose
+      - https://www.googleapis.com/auth/gmail.send
+    tools:
+      read:
+        - search_drive_files
+        - get_drive_file_content
+        - list_drive_items
+        - search_gmail_messages
+        - get_gmail_message_content
+        - get_gmail_messages_content_batch
+        - get_gmail_thread_content
+        - get_gmail_threads_content_batch
+        - list_gmail_labels
+      write:
+        - draft_gmail_message
+        - send_gmail_message
+
+# CRM: not chosen yet (SPEC section 14, open question 2).

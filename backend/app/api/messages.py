@@ -11,7 +11,8 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.agent.stream import sse_response
-from app.agent.tools import run_python
+from app.agent.tools import connectors, run_python
+from app.agent.tools.connectors import get_connectors_config
 from app.agent.tools.registry import ToolProvider
 from app.agent.turn import ACTIVE_STATUSES, STATUS_STREAMING, Emit, Turn, TurnOptions
 from app.api.conversations import get_owned_conversation
@@ -24,6 +25,7 @@ from app.models import Attachment, Conversation, Feedback, Message, RoutingDecis
 from app.router.classifier import Classification
 from app.router.config import get_routing_config
 from app.schemas.chat import FeedbackRequest, RegenerateRequest, SendMessageRequest
+from app.services import oauth
 
 router = APIRouter(tags=["messages"])
 
@@ -34,6 +36,8 @@ TITLE_CHARS = 60
 def get_tool_provider() -> ToolProvider:
     provider = ToolProvider()
     settings = get_settings()
+    if oauth.is_configured() and get_connectors_config().servers:
+        connectors.register(provider, get_sessionmaker(), get_connectors_config())
     if settings.sandbox_url:
         run_python.register(
             provider,

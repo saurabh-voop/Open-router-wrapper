@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     jwt_expiry_days: int = 7
     fernet_key: str = ""
 
+    # Google OAuth client for the Gmail/Drive connectors (SPEC 8.4). Redirect URI to register:
+    # {APP_BASE_URL}/api/connectors/google/callback
+    google_client_id: str = ""
+    google_client_secret: str = ""
+
     aws_region: str = "ap-south-1"
     s3_bucket: str = "relay-files"
     s3_endpoint_url: str | None = None  # set for MinIO in development

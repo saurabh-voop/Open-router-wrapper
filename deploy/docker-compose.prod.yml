@@ -75,6 +75,23 @@ services:
     depends_on: [api]
     logging: *logging
 
+  # Gmail/Drive connector (SPEC 8.4, docs/CONNECTORS.md): taylorwilsdon/google_workspace_mcp
+  # built from a pinned commit, external-OAuth stateless mode. Relay sends each user's
+  # short-lived Google access token per request; the server stores nothing on disk.
+  workspace-mcp:
+    build: https://github.com/taylorwilsdon/google_workspace_mcp.git#301151aec23b672f6ca2067451cd4f9f6e34cc41
+    environment:
+      MCP_ENABLE_OAUTH21: "true"
+      EXTERNAL_OAUTH21_PROVIDER: "true"
+      WORKSPACE_MCP_STATELESS_MODE: "true"
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      TOOLS: "drive gmail"
+      WORKSPACE_MCP_DISABLED_TOOLS: "start_google_auth,get_drive_file_download_url,get_gmail_attachment_content"
+      WORKSPACE_MCP_TOKEN_VALIDATION_CACHE_TTL: "300"
+    restart: unless-stopped
+    logging: *logging
+
   sandbox-runtime:
     image: relay-sandbox-runtime:1
     build: ../sandbox/runtime
