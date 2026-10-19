@@ -103,7 +103,9 @@ async def send_message(
         ):
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Attachment not found")
         had_attachments = await db.scalar(
-            select(Attachment.id).where(Attachment.conversation_id == conv.id).limit(1)
+            select(Attachment.id)
+            .where(Attachment.conversation_id == conv.id, Attachment.message_id.is_not(None))
+            .limit(1)
         )
         if had_attachments is None:
             conv.confidential = True  # default on for conversations with attachments (SPEC 10)

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
-from app.api import admin, auth, conversations, health, messages
+from app.api import admin, auth, conversations, files, health, messages
 from app.core.config import get_settings
 from app.core.db import get_sessionmaker
 from app.llm import catalog
@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(conversations.router)
     app.include_router(messages.router)
+    app.include_router(files.router)
     app.include_router(admin.router)
     return app
 

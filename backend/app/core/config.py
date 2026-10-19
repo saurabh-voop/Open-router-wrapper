@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     s3_bucket: str = "relay-files"
     s3_endpoint_url: str | None = None  # set for MinIO in development
 
+    clamav_host: str = ""
+    clamav_port: int = 3310
+
     default_monthly_cap_usd: float = 50.0
     app_base_url: str = "http://localhost:3000"
 

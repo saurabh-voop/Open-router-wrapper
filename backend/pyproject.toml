@@ -20,6 +20,7 @@ dependencies = [
     "boto3>=1.43.114",
     "pypdf>=6.21.1",
     "openpyxl>=3.1.5",
+    "python-multipart>=0.0.32",
 ]
 
 [dependency-groups]
