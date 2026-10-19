@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.agent.history import History, build_history
@@ -98,144 +98,192 @@ class Turn:
         async with self.sessionmaker() as db:
             user, conv, final = await self._load(db)
             try:
-                await self._check_budget(db, user)
-            except BudgetExceeded as err:
-                await self._fail(db, final, str(err), emit)
-                return
+                await self._start(db, user, conv, final, emit)
+            except Exception:
+                # Never leave the placeholder "streaming": that would lock the conversation.
+                logger.exception("turn failed before the model loop")
+                await self._fail(db, final, "Something went wrong while answering.", emit)
 
-            user_msg = await db.get(Message, self.user_message_id)
-            assert user_msg is not None
-            history = await build_history(
-                db,
-                conv,
-                current_user_message_id=user_msg.id,
-                sandbox_available=self.tools.sandbox_available,
-            )
-            catalog = await load_catalog(db)
-            request = RouteRequest(
-                text=str(user_msg.content.get("text") or ""),
-                history=history.classifier_turns,
-                attachments=history.current_attachments,
-                est_tokens=history.est_tokens,
-                state=StickyState(conv.current_model, conv.current_category, conv.locked_model),
-                confidential=conv.confidential,
-                toggles=self.options.toggles,
-                override_model=self.options.override_model,
-                reuse=self.options.reuse,
-            )
-            try:
-                outcome = await route(
-                    request, client=self.client, config=self.config, catalog=catalog
-                )
-            except RoutingError as err:
-                await self._fail(db, final, err.user_message, emit)
-                return
+    async def _start(
+        self, db: AsyncSession, user: User, conv: Conversation, final: Message, emit: Emit
+    ) -> None:
+        try:
+            await self._check_budget(db, user)
+        except BudgetExceeded as err:
+            await self._fail(db, final, str(err), emit)
+            return
 
-            if outcome.text != request.text:
-                _replace_current_user_text(history, outcome.text)
-            if outcome.classifier_cost:
-                await budget.add_cost(db, user.id, outcome.classifier_cost)
+        user_msg = await db.get(Message, self.user_message_id)
+        assert user_msg is not None
+        history = await build_history(
+            db,
+            conv,
+            current_user_message_id=user_msg.id,
+            sandbox_available=self.tools.sandbox_available,
+        )
+        catalog = await load_catalog(db)
+        request = RouteRequest(
+            text=str(user_msg.content.get("text") or ""),
+            history=history.classifier_turns,
+            attachments=history.current_attachments,
+            est_tokens=history.est_tokens,
+            state=StickyState(conv.current_model, conv.current_category, conv.locked_model),
+            confidential=conv.confidential,
+            toggles=self.options.toggles,
+            override_model=self.options.override_model,
+            reuse=self.options.reuse,
+        )
+        try:
+            outcome = await route(request, client=self.client, config=self.config, catalog=catalog)
+        except RoutingError as err:
+            await self._fail(db, final, err.user_message, emit)
+            return
 
-            decision = RoutingDecision(
-                message_id=final.id,
-                category=outcome.category,
-                confidence=outcome.confidence,
-                is_followup=outcome.is_followup,
-                needs=outcome.needs,
-                candidates=outcome.candidates,
-                chosen_model=outcome.model,
-                switched=outcome.switched,
-                forced=outcome.forced,
-                reason=outcome.reason,
-                classifier_latency_ms=outcome.classifier_latency_ms,
-            )
-            db.add(decision)
-            conv.current_model = outcome.model
-            conv.current_category = outcome.new_category
-            final.content = {
-                **final.content,
-                "tools": sorted(outcome.tools),
-                "fallbacks": outcome.fallbacks,
+        if outcome.text != request.text:
+            _replace_current_user_text(history, outcome.text)
+        if outcome.classifier_cost:
+            await budget.add_cost(db, user.id, outcome.classifier_cost)
+
+        decision = RoutingDecision(
+            message_id=final.id,
+            category=outcome.category,
+            confidence=outcome.confidence,
+            is_followup=outcome.is_followup,
+            needs=outcome.needs,
+            candidates=outcome.candidates,
+            chosen_model=outcome.model,
+            switched=outcome.switched,
+            forced=outcome.forced,
+            reason=outcome.reason,
+            classifier_latency_ms=outcome.classifier_latency_ms,
+        )
+        db.add(decision)
+        conv.current_model = outcome.model
+        conv.current_category = outcome.new_category
+        final.content = {
+            **final.content,
+            "tools": sorted(outcome.tools),
+            "fallbacks": outcome.fallbacks,
+        }
+        await db.commit()
+
+        await emit(
+            {
+                "type": "route",
+                "message_id": str(final.id),
+                "model": outcome.model,
+                "category": outcome.category,
+                "reason": outcome.reason,
+                "switched": outcome.switched,
+                "forced": outcome.forced,
+                "confidential": conv.confidential,
             }
-            await db.commit()
-
-            await emit(
-                {
-                    "type": "route",
-                    "message_id": str(final.id),
-                    "model": outcome.model,
-                    "category": outcome.category,
-                    "reason": outcome.reason,
-                    "switched": outcome.switched,
-                    "forced": outcome.forced,
-                    "confidential": conv.confidential,
-                }
-            )
-            state = _LoopState(
-                model=outcome.model, fallbacks=outcome.fallbacks, tool_names=sorted(outcome.tools)
-            )
-            if outcome.classifier_cost:
-                state.turn_cost += outcome.classifier_cost
-            await self._loop(db, user, conv, final, decision, history.messages, state, emit)
+        )
+        state = _LoopState(
+            model=outcome.model, fallbacks=outcome.fallbacks, tool_names=sorted(outcome.tools)
+        )
+        if outcome.classifier_cost:
+            state.turn_cost += outcome.classifier_cost
+        await self._loop(db, user, conv, final, decision, history.messages, state, emit)
 
     async def resume(self, emit: Emit, *, tool_run_id: uuid.UUID, approved: bool) -> None:
         """Continue a turn paused for approval of a connector write action (SPEC 8.4)."""
         async with self.sessionmaker() as db:
             user, conv, final = await self._load(db)
-            run = await db.get(ToolRun, tool_run_id)
-            decision = await db.scalar(
-                select(RoutingDecision).where(RoutingDecision.message_id == final.id)
-            )
-            if run is None or decision is None or run.status != "pending_approval":
-                await emit({"type": "error", "message": "That action is no longer pending."})
-                return
-            steps = await self._turn_steps(db)
-            state = _LoopState(
-                model=decision.answered_model or decision.chosen_model,
-                fallbacks=[],
-                tool_names=list(final.content.get("tools") or []),
-                step=sum(1 for s in steps if s.role == "assistant"),
-                display_parts=list(final.content.get("display_parts") or []),
-                files=list(final.content.get("files") or []),
-            )
-            final.content = {**final.content, "status": STATUS_STREAMING}
-            if approved:
-                run.approved_by = user.id
-                run.status = "running"
-            else:
-                run.status = "rejected"
-            await db.commit()
-
-            toolset = await self.tools.build(state.tool_names, user=user, conversation=conv)
-            step_msg = await db.get(Message, run.message_id)
-            assert step_msg is not None
-            ctx = ToolContext(user_id=user.id, conversation_id=conv.id, message_id=step_msg.id)
-            if approved:
-                result = await self._execute(db, toolset, run, ctx, emit)
-            else:
-                result = ToolResult(
-                    content="The user rejected this action. It was not performed.",
-                    summary="rejected by user",
-                    ok=False,
+            # Claim the run atomically: two Approve clicks must not run the action twice.
+            claimed = await db.scalar(
+                update(ToolRun)
+                .where(ToolRun.id == tool_run_id, ToolRun.status == "pending_approval")
+                .values(
+                    status="running" if approved else "rejected",
+                    approved_by=user.id if approved else None,
                 )
-                await emit({"type": "tool_end", "tool_run_id": str(run.id), "tool": run.tool,
-                            "ok": False, "summary": "Rejected"})  # fmt: skip
-            await self._store_tool_message(db, run, result, state)
-
-            calls = [ToolCall(**c) for c in step_msg.content.get("tool_calls") or []]
-            answered = {s.content.get("tool_call_id") for s in steps if s.role == "tool"}
-            answered.add(run.tool_call_id)
-            remaining = [c for c in calls if c.id not in answered]
-            if await self._run_calls(db, toolset, remaining, ctx, final, state, emit) == "paused":
-                return
-
-            history = await build_history(
-                db,
-                conv,
-                current_user_message_id=self.user_message_id,
-                sandbox_available=self.tools.sandbox_available,
+                .returning(ToolRun.id)
             )
-            await self._loop(db, user, conv, final, decision, history.messages, state, emit)
+            if claimed is None:
+                await db.rollback()
+                await emit({"type": "error", "message": "That action is no longer pending."})
+                await emit({"type": "done", "message_id": str(final.id)})
+                return
+            final.content = {**final.content, "status": STATUS_STREAMING}
+            await db.commit()
+            try:
+                await self._resume(db, user, conv, final, tool_run_id, approved, emit)
+            except Exception:
+                logger.exception("turn failed while resuming")
+                await self._fail(db, final, "Something went wrong while answering.", emit)
+
+    async def _resume(
+        self,
+        db: AsyncSession,
+        user: User,
+        conv: Conversation,
+        final: Message,
+        tool_run_id: uuid.UUID,
+        approved: bool,
+        emit: Emit,
+    ) -> None:
+        run = await db.get(ToolRun, tool_run_id, populate_existing=True)
+        decision = await db.scalar(
+            select(RoutingDecision).where(RoutingDecision.message_id == final.id)
+        )
+        if run is None or decision is None:
+            raise LookupError("paused turn is incomplete")
+        steps = await self._turn_steps(db)
+        state = _LoopState(
+            model=decision.answered_model or decision.chosen_model,
+            fallbacks=[],
+            tool_names=list(final.content.get("tools") or []),
+            step=sum(1 for s in steps if s.role == "assistant"),
+            display_parts=list(final.content.get("display_parts") or []),
+            files=list(final.content.get("files") or []),
+        )
+        toolset = await self.tools.build(state.tool_names, user=user, conversation=conv)
+        step_msg = await db.get(Message, run.message_id)
+        assert step_msg is not None
+        ctx = ToolContext(user_id=user.id, conversation_id=conv.id, message_id=step_msg.id)
+        if not approved:
+            result = ToolResult(
+                content="The user rejected this action. It was not performed.",
+                summary="rejected by user",
+                ok=False,
+            )
+            await emit({"type": "tool_end", "tool_run_id": str(run.id), "tool": run.tool,
+                        "ok": False, "summary": "Rejected"})  # fmt: skip
+        elif run.tool not in toolset.local:
+            run.status = "failed"
+            result = ToolResult(
+                f"The {run.tool} action is unavailable right now (connector unreachable or "
+                "disconnected). It was not performed.",
+                "tool unavailable",
+                ok=False,
+            )
+            await emit({"type": "tool_end", "tool_run_id": str(run.id), "tool": run.tool,
+                        "ok": False, "summary": "Unavailable"})  # fmt: skip
+        else:
+            result = await self._execute(db, toolset, run, ctx, emit)
+        await self._store_tool_message(db, run, result, state)
+        await db.commit()
+
+        calls = [ToolCall(**c) for c in step_msg.content.get("tool_calls") or []]
+        answered = {s.content.get("tool_call_id") for s in steps if s.role == "tool"}
+        answered.add(run.tool_call_id)
+        remaining = [c for c in calls if c.id not in answered]
+        if await self._run_calls(db, toolset, remaining, ctx, final, state, emit) == "paused":
+            return
+        try:
+            await self._check_budget(db, user)
+        except BudgetExceeded as err:
+            await self._fail(db, final, str(err), emit, state=state)
+            return
+
+        history = await build_history(
+            db,
+            conv,
+            current_user_message_id=self.user_message_id,
+            sandbox_available=self.tools.sandbox_available,
+        )
+        await self._loop(db, user, conv, final, decision, history.messages, state, emit)
 
     # ------------------------------------------------------------ the loop
 
@@ -311,6 +359,11 @@ class Turn:
                 await self._finish(db, user, final, completion, state, emit)
                 return
         except OpenRouterError as err:
+            if err.usage is not None and err.usage.cost:
+                # A failed stream can still be charged; keep the ledger honest.
+                state.turn_cost += err.usage.cost
+                await budget.add_cost(db, user.id, err.usage.cost)
+                await db.commit()
             await self._fail(db, final, err.user_message, emit, state=state)
         except BudgetExceeded as err:
             await self._fail(db, final, str(err), emit, state=state)
@@ -472,7 +525,11 @@ class Turn:
     async def _turn_steps(self, db: AsyncSession) -> list[Message]:
         rows = await db.scalars(
             select(Message)
-            .where(Message.parent_id == self.user_message_id, Message.id != self.final_message_id)
+            .where(
+                Message.parent_id == self.user_message_id,
+                Message.id != self.final_message_id,
+                Message.superseded.is_(False),
+            )
             .order_by(Message.created_at, Message.id)
         )
         return list(rows)

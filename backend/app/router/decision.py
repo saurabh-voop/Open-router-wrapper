@@ -18,7 +18,7 @@ from app.llm.openrouter import OpenRouterClient
 from app.models import CatalogModel
 from app.router import classifier as clf
 from app.router.config import RoutingConfig, ToolName
-from app.router.filter import Requirements, apply_filter, has_native_file_input
+from app.router.filter import Requirements, apply_filter, has_native_file_input, rejection_reason
 from app.router.policy import fallbacks_for, pick
 from app.router.sticky import StickyState, decide
 
@@ -100,6 +100,7 @@ async def _classify(
     client: OpenRouterClient,
     config: RoutingConfig,
     pre: clf.PreRules,
+    catalog: Mapping[str, CatalogModel],
 ) -> clf.Classification:
     if req.reuse is not None:
         return req.reuse
@@ -121,13 +122,18 @@ async def _classify(
             reason="short follow-up to the previous answer",
             source="rule",
         )
-    result = await clf.classify(
-        client,
-        config,
-        history=req.history,
-        text=pre.text,
-        attachments=[f"{a.filename} ({a.kind})" for a in req.attachments],
-    )
+    classifier_row = catalog.get(config.classifier_model)
+    if rejection_reason(classifier_row, Requirements()) is not None:
+        # SPEC 5.3: the classifier must itself pass the ZDR filter. Never call it otherwise.
+        result = None
+    else:
+        result = await clf.classify(
+            client,
+            config,
+            history=req.history,
+            text=pre.text,
+            attachments=[f"{a.filename} ({a.kind})" for a in req.attachments],
+        )
     if result is not None:
         return result
     # Timeout or invalid JSON: keep the current model; new conversation -> default category.
@@ -153,7 +159,7 @@ async def route(
     pre = clf.apply_pre_rules(
         req.text, has_image=has_image, is_new_conversation=req.state.current_model is None
     )
-    c = await _classify(req, client, config, pre)
+    c = await _classify(req, client, config, pre, catalog)
     pinned = req.override_model or req.state.locked_model
     current = req.state.current_model
 

@@ -6,6 +6,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import app.services.files as file_service
 from app.api import admin, auth, connectors, conversations, files, health, messages
@@ -18,11 +20,26 @@ from app.router.config import get_routing_config
 logger = logging.getLogger(__name__)
 
 
+async def mark_interrupted_turns(maker: async_sessionmaker[AsyncSession]) -> None:
+    """Answers left "streaming" by a previous process can never finish: mark them failed so
+    the conversation is not locked. Assumes one API process (SPEC section 3)."""
+    async with maker() as db:
+        await db.execute(
+            text(
+                "UPDATE messages SET content = content || jsonb_build_object("
+                "'status', 'error', 'error', 'Interrupted by a server restart. Please retry.') "
+                "WHERE role = 'assistant' AND content->>'status' = 'streaming'"
+            )
+        )
+        await db.commit()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     config = get_routing_config()
     tasks: list[asyncio.Task[object]] = []
+    await mark_interrupted_turns(get_sessionmaker())
     try:
         await file_service.ensure_bucket()
     except Exception:  # dev convenience only; uploads will report the real error

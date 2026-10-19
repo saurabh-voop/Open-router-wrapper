@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
-import re
 import uuid
 from typing import Annotated
 from urllib.parse import quote
@@ -24,12 +24,6 @@ router = APIRouter(prefix="/files", tags=["files"])
 INLINE_MIMES = att_service.IMAGE_MIMES | att_service.PDF_MIMES
 
 
-def safe_filename(name: str | None) -> str:
-    base = (name or "file").replace("\\", "/").rsplit("/", 1)[-1]
-    base = re.sub(r"[\x00-\x1f\x7f]", "", base).strip().strip(".") or "file"
-    return base[:200]
-
-
 @router.post("", response_model=AttachmentOut, status_code=status.HTTP_201_CREATED)
 async def upload(
     user: CurrentUser,
@@ -42,9 +36,10 @@ async def upload(
     data = await file.read(att_service.MAX_FILE_BYTES + 1)
     if len(data) > att_service.MAX_FILE_BYTES:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "Files can be at most 25 MB")
-    filename = safe_filename(file.filename)
+    filename = att_service.safe_filename(file.filename)
     try:
-        info = att_service.inspect(data, filename, file.content_type or "")
+        # PDF/Excel parsing is CPU-bound: keep it off the event loop so streams stay live.
+        info = await asyncio.to_thread(att_service.inspect, data, filename, file.content_type or "")
     except att_service.AttachmentError as err:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(err)) from err
     try:

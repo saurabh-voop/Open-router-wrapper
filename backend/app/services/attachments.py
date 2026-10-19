@@ -6,6 +6,8 @@ import base64
 import csv
 import io
 import logging
+import re
+import zipfile
 from dataclasses import dataclass
 from typing import Any
 
@@ -34,6 +36,13 @@ TEXT_EXTENSIONS = {
     ".ts", ".tsx", ".jsx", ".py", ".sql", ".sh", ".java", ".go", ".rs", ".c", ".h", ".cpp",
     ".rb", ".php", ".ini", ".toml", ".log",
 }  # fmt: skip
+
+
+def safe_filename(name: str | None) -> str:
+    """Last path segment, no control characters (they would break Content-Disposition)."""
+    base = (name or "file").replace("\\", "/").rsplit("/", 1)[-1]
+    base = re.sub(r"[\x00-\x1f\x7f]", "", base).strip().strip(".") or "file"
+    return base[:200]
 
 
 class AttachmentError(ValueError):
@@ -114,6 +123,7 @@ def inspect(data: bytes, filename: str, declared_mime: str) -> Inspection:
             tokens = (pages or 1) * TOKENS_PER_PDF_PAGE
         return Inspection(mime, pages, tokens)
     if kind == "spreadsheet" and mime != "text/csv":
+        check_xlsx_size(data, filename)
         return Inspection(mime, None, len(spreadsheet_preview(data)) // CHARS_PER_TOKEN)
     text_len = min(len(data), INLINE_TEXT_CHARS)
     return Inspection(mime, None, text_len // CHARS_PER_TOKEN)
@@ -136,8 +146,24 @@ def _pdf_stats(data: bytes) -> tuple[int | None, int]:
         return None, 0
 
 
+MAX_XLSX_UNCOMPRESSED = 100 * 1024 * 1024
+
+
+def check_xlsx_size(data: bytes, filename: str = "spreadsheet") -> None:
+    """Refuse zip bombs: openpyxl loads sharedStrings.xml fully even in read-only mode."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            total = sum(i.file_size for i in zf.infolist())
+    except zipfile.BadZipFile as err:
+        raise AttachmentError(f"{filename}: not a valid Excel file") from err
+    if total > MAX_XLSX_UNCOMPRESSED:
+        raise AttachmentError(f"{filename}: the spreadsheet is too large when unpacked")
+
+
 def spreadsheet_preview(data: bytes) -> str:
     from openpyxl import load_workbook
+
+    check_xlsx_size(data)
 
     wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
     out = io.StringIO()

@@ -18,7 +18,7 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.llm.openrouter import OpenRouterClient, OpenRouterError
+from app.llm.openrouter import OpenRouterClient
 from app.models import CatalogModel
 from app.router.config import RoutingConfig
 
@@ -158,8 +158,8 @@ async def run_sync_once(
     try:
         async with sessionmaker() as db:
             last_report = await sync_catalog(db, client, config)
-    except (OpenRouterError, OSError) as err:
-        logger.warning("catalog sync failed: %s", err)
+    except Exception as err:  # never let the hourly loop die (DB restarts, bad payloads)
+        logger.warning("catalog sync failed: %s", type(err).__name__)
         last_report = CatalogReport(
             synced_at=last_report.synced_at,
             model_count=last_report.model_count,

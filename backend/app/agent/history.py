@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -112,7 +113,12 @@ async def build_history(
         parts: list[dict[str, Any]] = [{"type": "text", "text": text}]
         for att in attachments.get(user_msg.id, []):
             data = await file_service.get_object(att.s3_key)
-            parts += att_service.content_parts(att, data, sandbox_available=sandbox_available)
+            try:
+                parts += await asyncio.to_thread(
+                    att_service.content_parts, att, data, sandbox_available=sandbox_available
+                )
+            except att_service.AttachmentError as err:
+                parts.append({"type": "text", "text": f"[{err}]"})
             history.est_tokens += att.est_tokens or 0
             if is_current:
                 history.current_attachments.append(att_service.info(att))

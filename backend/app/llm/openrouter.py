@@ -95,10 +95,13 @@ StreamEvent = TextDelta | Completion
 class OpenRouterError(Exception):
     """An OpenRouter failure, with a message that can be shown to the user as is."""
 
-    def __init__(self, user_message: str, *, status: int | None = None) -> None:
+    def __init__(
+        self, user_message: str, *, status: int | None = None, usage: Usage | None = None
+    ) -> None:
         super().__init__(user_message)
         self.user_message = user_message
         self.status = status
+        self.usage = usage  # charges already reported before the failure, if any
 
 
 # Stable ``error.metadata.error_type`` values (OpenRouter errors guide) -> user message.
@@ -282,10 +285,12 @@ class OpenRouterClient:
                         yield TextDelta(text)
         except openai.OpenAIError as err:
             logger.warning("openrouter stream failed: %s", type(err).__name__)
-            raise _to_user_error(err) from err
+            user_err = _to_user_error(err)
+            user_err.usage = usage
+            raise user_err from err
 
         if finish_reason == "error":
-            raise OpenRouterError("The model stopped with an error. Please try again.")
+            raise OpenRouterError("The model stopped with an error. Please try again.", usage=usage)
 
         yield Completion(
             model=answered_model,

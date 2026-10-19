@@ -21,10 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 import app.services.files as file_service
 from app.agent.tools.base import OutputFile, ToolContext, ToolResult
 from app.models import Attachment, Conversation, User
+from app.services import attachments as att_service
 
 logger = logging.getLogger(__name__)
 
 MAX_INPUT_BYTES = 250 * 1024 * 1024
+MAX_INPUT_FILES = 20  # the sandbox service accepts at most 20 files per job
 MAX_RESULT_CHARS = 20 * 1024  # what the model sees from stdout/stderr (SPEC 8.3)
 SANDBOX_TIMEOUT_S = 90  # the job itself is capped at 60 s inside the sandbox
 OUTPUT_MIMES = {
@@ -40,6 +42,24 @@ OUTPUT_MIMES = {
     ".pdf": "application/pdf",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
+
+
+async def input_attachments(
+    db: AsyncSession, user_id: uuid.UUID, conversation_id: uuid.UUID
+) -> list[Attachment]:
+    """Files mounted at /data: the user's uploads sent in this conversation (not earlier
+    sandbox outputs, not unsent uploads), newest first, at most MAX_INPUT_FILES."""
+    rows = await db.scalars(
+        select(Attachment)
+        .where(
+            Attachment.conversation_id == conversation_id,
+            Attachment.user_id == user_id,
+            Attachment.message_id.is_not(None),
+        )
+        .order_by(Attachment.created_at.desc())
+        .limit(MAX_INPUT_FILES)
+    )
+    return list(rows)
 
 
 class SandboxClient:
@@ -123,6 +143,13 @@ class RunPythonTool:
             inputs = await self._inputs(db)
             try:
                 result = await self.client.run(code, inputs)
+            except httpx.HTTPStatusError as err:
+                logger.warning("sandbox rejected the job: HTTP %s", err.response.status_code)
+                return ToolResult(
+                    "The code sandbox rejected the job (inputs too large or too many files).",
+                    f"sandbox HTTP {err.response.status_code}",
+                    ok=False,
+                )
             except httpx.HTTPError as err:
                 logger.warning("sandbox call failed: %s", type(err).__name__)
                 return ToolResult(
@@ -152,17 +179,9 @@ class RunPythonTool:
         return ToolResult("\n".join(lines), summary, ok=ok, files=files)
 
     async def _inputs(self, db: AsyncSession) -> list[tuple[str, bytes]]:
-        rows = await db.scalars(
-            select(Attachment)
-            .where(
-                Attachment.conversation_id == self.conversation.id,
-                Attachment.user_id == self.user.id,
-            )
-            .order_by(Attachment.created_at)
-        )
         files: list[tuple[str, bytes]] = []
         total = 0
-        for att in rows:
+        for att in await input_attachments(db, self.user.id, self.conversation.id):
             if total + att.size_bytes > MAX_INPUT_BYTES:
                 break
             files.append((att.filename, await file_service.get_object(att.s3_key)))
@@ -174,7 +193,7 @@ class RunPythonTool:
     ) -> list[OutputFile]:
         out: list[OutputFile] = []
         for f in raw_files:
-            name = str(f.get("name") or "output").replace("/", "_")[:200]
+            name = att_service.safe_filename(str(f.get("name") or "output").replace("/", "_"))
             data = base64.b64decode(str(f.get("content_b64") or ""))
             mime = _output_mime(name)
             att_id = uuid.uuid4()
@@ -202,14 +221,7 @@ def register(
 ) -> None:
     async def factory(user: User, conversation: Conversation) -> list[Any]:
         async with sessionmaker() as db:
-            names = list(
-                await db.scalars(
-                    select(Attachment.filename).where(
-                        Attachment.conversation_id == conversation.id,
-                        Attachment.user_id == user.id,
-                    )
-                )
-            )
+            names = [a.filename for a in await input_attachments(db, user.id, conversation.id)]
         return [RunPythonTool(client, sessionmaker, user, conversation, names)]
 
     provider.register("run_python", factory)

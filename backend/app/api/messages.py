@@ -7,7 +7,7 @@ from functools import lru_cache
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.agent.stream import sse_response
@@ -68,6 +68,12 @@ def _turn(
 
 
 async def _ensure_idle(db: DbSession, conv: Conversation) -> None:
+    # Serialise turn starts per conversation: held until this request commits its
+    # placeholder, so a concurrent send sees it and gets 409 instead of a second turn.
+    await db.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))"),
+        {"key": f"conversation:{conv.id}"},
+    )
     active = await db.scalar(
         select(Message.content["status"].astext)
         .where(
