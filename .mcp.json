@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "openrouter-docs": {
+      "type": "http",
+      "url": "https://openrouter.ai/docs/_mcp/server"
+    }
+  }
+}

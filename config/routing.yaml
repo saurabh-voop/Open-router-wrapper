@@ -1,0 +1,103 @@
+# Relay routing policy. See docs/SPEC.md section 5.
+#
+# IMPORTANT: model slugs below are placeholders (<FILL: ...>).
+# Phase 3 fills them from the live OpenRouter catalog:
+#   - only models returned by GET /api/v1/models/user
+#   - only models with at least one ZDR endpoint (GET /api/v1/endpoints/zdr)
+#   - pick by current benchmark standing for that category, quality first
+# Do not invent slugs. The app refuses to start if a slug is not in the catalog.
+
+version: 1
+
+classifier_model: "<FILL: fast, cheap model with ZDR endpoint and structured output support>"
+classifier_timeout_s: 3
+
+switch_threshold: 0.75      # min classifier confidence to switch models mid-conversation
+max_tool_steps: 10
+context_safety_factor: 1.2  # require context_length >= estimated_tokens * this
+
+default_category: general
+
+categories:
+  coding:
+    description: "Write, review, debug or explain code, SQL, regex, shell commands, config files."
+    examples:
+      - "Fix this FastAPI endpoint, it returns 422"
+      - "Write a SQL query for monthly revenue by customer"
+    models:
+      - "<FILL: strongest coding model>"
+      - "<FILL: fallback 1>"
+      - "<FILL: fallback 2>"
+    tools: [run_python]
+
+  data_analysis:
+    description: "Analyse tables, CSV or Excel data; compute numbers; make charts."
+    examples:
+      - "Which customers in this sheet grew the most last quarter?"
+      - "Plot monthly genset sales from the attached CSV"
+    models:
+      - "<FILL: strongest model with reliable tool calling>"
+      - "<FILL: fallback 1>"
+    tools: [run_python]
+
+  research:
+    description: "Questions needing current facts from the web: news, prices, companies, people, recent events."
+    examples:
+      - "What did Aditya Birla Group announce this month?"
+      - "Current price of a 500 kVA diesel genset in India"
+    models:
+      - "<FILL: strong model with native web search>"
+      - "<FILL: fallback 1>"
+    tools: [web_search]
+
+  document_qa:
+    description: "Questions about an attached or stored document: summarise, extract, compare, check."
+    examples:
+      - "Summarise the payment terms in this tender PDF"
+      - "List every deadline in these two contracts"
+    models:
+      - "<FILL: strongest long-context model with native file input>"
+      - "<FILL: fallback 1>"
+    tools: []
+
+  writing:
+    description: "Draft or rewrite emails, proposals, posts; change tone; translate."
+    examples:
+      - "Make this follow-up email shorter and more direct"
+      - "Translate this quotation note into Marathi"
+    models:
+      - "<FILL: best writing model>"
+      - "<FILL: fallback 1>"
+    tools: []
+
+  reasoning:
+    description: "Planning, strategy, maths, multi-step problems with no code or web needed."
+    examples:
+      - "Plan a 6-week rollout for the new AMC offering"
+      - "Is this pricing model profitable at 40 units a month?"
+    models:
+      - "<FILL: strongest reasoning model>"
+      - "<FILL: fallback 1>"
+    tools: []
+
+  actions:
+    description: "Read or act on the user's Gmail, Drive or CRM."
+    examples:
+      - "Find the last email from the Hindalco procurement team"
+      - "Save this proposal to the Clients folder in Drive"
+    models:
+      - "<FILL: strongest model with reliable tool calling>"
+      - "<FILL: fallback 1>"
+    tools: [connectors]
+
+  general:
+    description: "Everything else: quick facts, small talk, short explanations."
+    examples:
+      - "What does AMC mean in the genset business?"
+    models:
+      - "<FILL: strong general model>"
+      - "<FILL: fallback 1>"
+    tools: []
+
+# Baseline used by the eval harness (Phase 4). The router must beat or match it.
+baseline_model: "<FILL: single best overall model>"

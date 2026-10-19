@@ -1,0 +1,40 @@
+# Development stack. Production overrides live in docker-compose.prod.yml (Phase 9).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: relay
+      POSTGRES_PASSWORD: relay
+      POSTGRES_DB: relay
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U relay"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+asyncpg://relay:relay@db:5432/relay
+      ROUTING_CONFIG_PATH: /app/config/routing.yaml
+      CONNECTORS_CONFIG_PATH: /app/config/connectors.yaml
+    ports: ["8000:8000"]
+    depends_on:
+      db: {condition: service_healthy}
+
+  web:
+    build:
+      context: frontend
+      args:
+        API_INTERNAL_URL: http://api:8000
+    ports: ["3000:3000"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
