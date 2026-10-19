@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
+import app.services.files as file_service
 from app.api import admin, auth, conversations, files, health, messages
 from app.core.config import get_settings
 from app.core.db import get_sessionmaker
@@ -22,6 +23,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     config = get_routing_config()
     tasks: list[asyncio.Task[object]] = []
+    try:
+        await file_service.ensure_bucket()
+    except Exception:  # dev convenience only; uploads will report the real error
+        logger.warning("could not ensure the development S3 bucket exists")
     if settings.catalog_sync_enabled:
         client = get_openrouter()
         maker = get_sessionmaker()

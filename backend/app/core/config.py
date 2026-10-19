@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     s3_bucket: str = "relay-files"
     s3_endpoint_url: str | None = None  # set for MinIO in development
 
+    sandbox_url: str = ""  # e.g. http://sandbox:8100; empty disables run_python
+    sandbox_token: str = ""
+
     clamav_host: str = ""
     clamav_port: int = 3310
 

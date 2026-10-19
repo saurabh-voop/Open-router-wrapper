@@ -34,6 +34,26 @@ jobs:
       - run: uv run mypy app tests
       - run: uv run pytest -q
 
+  sandbox:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sandbox
+    env:
+      SANDBOX_WALL_TIME_S: "10"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy app
+      - run: docker build -t relay-sandbox-runtime:1 runtime
+      # Security tests run real job containers (network, filesystem, timeout, fork bomb).
+      - run: uv run pytest -q -rs
+
   frontend:
     runs-on: ubuntu-latest
     defaults:

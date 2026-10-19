@@ -64,3 +64,21 @@ async def delete_objects(keys: Sequence[str]) -> None:
         await asyncio.to_thread(
             client.delete_objects, Bucket=bucket, Delete={"Objects": batch, "Quiet": True}
         )
+
+
+async def ensure_bucket() -> None:
+    """Development only (S3_ENDPOINT_URL set): create the bucket if the local S3 lacks it."""
+    settings = get_settings()
+    if not settings.s3_endpoint_url:
+        return
+    client = s3_client()
+
+    def _ensure() -> None:
+        existing = {b["Name"] for b in client.list_buckets().get("Buckets", [])}
+        if settings.s3_bucket not in existing:
+            client.create_bucket(
+                Bucket=settings.s3_bucket,
+                CreateBucketConfiguration={"LocationConstraint": settings.aws_region},  # type: ignore[typeddict-item]
+            )
+
+    await asyncio.to_thread(_ensure)

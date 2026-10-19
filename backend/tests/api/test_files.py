@@ -34,6 +34,7 @@ def fake() -> Iterator[FakeOpenRouter]:
     f = FakeOpenRouter()
     with respx.mock(assert_all_called=False) as mock:
         mock.post(CHAT_URL).mock(side_effect=f)
+        f.router = mock
         yield f
 
 
@@ -162,3 +163,72 @@ async def test_attachment_cannot_be_reused_by_another_user(
         data={"conversation_id": alice_conv},
     )
     assert resp.status_code == 404
+
+
+SANDBOX_URL = "http://sandbox.test"
+CHART = b"\x89PNG\r\n\x1a\n" + b"chart"
+
+
+async def test_plot_from_csv_returns_chart_in_chat(
+    client: AsyncClient, db: AsyncSession, alice: User, fake: FakeOpenRouter
+) -> None:
+    import base64
+    import json
+
+    import httpx
+
+    from app.agent.tools import run_python
+    from app.api.messages import get_tool_provider
+    from app.core.db import get_sessionmaker
+    from tests.api.test_chat import tool_call_stream
+
+    provider = get_tool_provider()
+    run_python.register(provider, run_python.SandboxClient(SANDBOX_URL, "tok"), get_sessionmaker())
+    sandbox_calls: list[dict[str, object]] = []
+
+    def sandbox(request: httpx.Request) -> httpx.Response:
+        assert request.headers["authorization"] == "Bearer tok"
+        sandbox_calls.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "exit_code": 0,
+                "timed_out": False,
+                "stdout": "total 42",
+                "stderr": "",
+                "files": [{"name": "chart.png", "content_b64": base64.b64encode(CHART).decode()}],
+                "notes": [],
+            },
+        )
+
+    assert fake.router is not None
+    fake.router.post(f"{SANDBOX_URL}/run").mock(side_effect=sandbox)
+    fake.category = "data_analysis"
+    fake.streams = [
+        tool_call_stream("run_python", {"code": "plot()"}, model="acme/coder"),
+        text_stream("Here is the chart.", model="acme/coder"),
+    ]
+    try:
+        conv_id = await new_conversation(client)
+        csv = await upload(client, "sales.csv", b"month,amount\nJan,10\n", "text/csv", conv_id)
+        events = await send(
+            client, conv_id, "Plot monthly totals from this CSV", attachment_ids=[csv["id"]]
+        )
+    finally:
+        provider._factories.clear()
+
+    tools_offered = [t["function"]["name"] for t in fake.chat_bodies[0]["tools"]]
+    assert tools_offered == ["run_python"]
+    assert "sales.csv" in fake.chat_bodies[0]["tools"][0]["function"]["description"]
+    sent = sandbox_calls[0]["files"]
+    assert isinstance(sent, list) and sent[0]["name"] == "sales.csv"
+    file_ev = next(e for e in events if e["type"] == "file")
+    assert file_ev["filename"] == "chart.png" and file_ev["mime"] == "image/png"
+    tool_result = fake.chat_bodies[1]["messages"][-1]["content"]
+    assert "total 42" in tool_result and "chart.png" in tool_result
+
+    answer = (await client.get(f"/conversations/{conv_id}")).json()["messages"][-1]
+    assert answer["files"][0]["filename"] == "chart.png"
+    img = await client.get(f"/files/{file_ev['attachment_id']}")
+    assert img.status_code == 200 and img.content == CHART
+    assert img.headers["content-type"] == "image/png"

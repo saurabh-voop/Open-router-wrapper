@@ -1,4 +1,9 @@
 # Development stack. Production overrides live in docker-compose.prod.yml (Phase 9).
+#
+#   cp .env.example .env    # fill OPENROUTER_API_KEY, SANDBOX_TOKEN
+#   docker compose up --build
+#
+# Web on http://localhost:3000, API on http://localhost:8000.
 services:
   db:
     image: postgres:16-alpine
@@ -13,6 +18,12 @@ services:
       interval: 5s
       retries: 10
 
+  # S3 stand-in for development (SPEC 8.2): moto's S3 server, in memory, so files are
+  # lost when it restarts. Production uses AWS S3 in ap-south-1.
+  s3:
+    image: motoserver/moto:5.1.4
+    ports: ["5000:5000"]
+
   api:
     build:
       context: .
@@ -24,9 +35,15 @@ services:
       DATABASE_URL: postgresql+asyncpg://relay:relay@db:5432/relay
       ROUTING_CONFIG_PATH: /app/config/routing.yaml
       CONNECTORS_CONFIG_PATH: /app/config/connectors.yaml
+      S3_ENDPOINT_URL: http://s3:5000
+      S3_BUCKET: relay-files
+      AWS_ACCESS_KEY_ID: dev
+      AWS_SECRET_ACCESS_KEY: dev
+      SANDBOX_URL: http://sandbox:8100
     ports: ["8000:8000"]
     depends_on:
       db: {condition: service_healthy}
+      s3: {condition: service_started}
 
   web:
     build:
@@ -35,6 +52,44 @@ services:
         API_INTERNAL_URL: http://api:8000
     ports: ["3000:3000"]
     depends_on: [api]
+
+  # --- code execution (SPEC 8.3) -------------------------------------------------------
+  # Builds the per-job image; the container itself exits immediately.
+  sandbox-runtime:
+    image: relay-sandbox-runtime:1
+    build: sandbox/runtime
+    entrypoint: ["python", "-c", "pass"]
+    network_mode: none
+    restart: "no"
+
+  # The only thing with the Docker socket. It exposes container endpoints only
+  # (no images, exec, volumes API, networks, swarm). Reachable only from `sandbox`.
+  sandbox-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2
+    environment:
+      CONTAINERS: 1
+      POST: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [sandbox_ctl]
+
+  sandbox:
+    build: sandbox
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DOCKER_HOST: tcp://sandbox-proxy:2375
+      SANDBOX_IMAGE: relay-sandbox-runtime:1
+      # SANDBOX_RUNTIME: runsc   # enable when gVisor is installed on the host
+    depends_on:
+      sandbox-proxy: {condition: service_started}
+      sandbox-runtime: {condition: service_completed_successfully}
+    networks: [default, sandbox_ctl]
+
+networks:
+  sandbox_ctl:
+    internal: true
 
 volumes:
   pgdata:

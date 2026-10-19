@@ -38,6 +38,7 @@ class FakeOpenRouter:
         self.streams: list[str] = []
         self.chat_bodies: list[dict[str, Any]] = []
         self.classifier_calls = 0
+        self.router: respx.MockRouter | None = None
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if is_classifier(request):
@@ -53,6 +54,7 @@ def fake() -> Iterator[FakeOpenRouter]:
     f = FakeOpenRouter()
     with respx.mock(assert_all_called=False) as mock:
         mock.post(CHAT_URL).mock(side_effect=f)
+        f.router = mock
         yield f
 
 
