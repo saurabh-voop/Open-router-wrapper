@@ -21,7 +21,7 @@ TEST_DATABASE_URL = os.environ.get(
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ.setdefault("OPENROUTER_API_KEY", "test-key")
-os.environ.setdefault("JWT_SECRET", "test-secret-for-the-test-suite")
+os.environ.setdefault("JWT_SECRET", "test-secret-for-the-test-suite-0123456789")
 os.environ["CATALOG_SYNC_ENABLED"] = "false"
 os.environ["ROUTING_CONFIG_PATH"] = str(
     Path(__file__).resolve().parent / "fixtures" / "routing.yaml"

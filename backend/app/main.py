@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
-from app.api import admin, auth, conversations, health
+from app.api import admin, auth, conversations, health, messages
 from app.core.config import get_settings
 from app.core.db import get_sessionmaker
 from app.llm import catalog
@@ -25,7 +25,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     if settings.catalog_sync_enabled:
         client = get_openrouter()
         maker = get_sessionmaker()
-        tasks.append(asyncio.create_task(catalog.run_sync_once(maker, client, config)))
+        if settings.routing_strict or settings.is_production:
+            report = await catalog.run_sync_once(maker, client, config)
+            problems = ([report.error] if report.error else []) + report.warnings
+            if problems:
+                raise RuntimeError("routing.yaml is not usable: " + "; ".join(problems))
+        else:
+            tasks.append(asyncio.create_task(catalog.run_sync_once(maker, client, config)))
         tasks.append(asyncio.create_task(catalog.sync_forever(maker, client, config)))
     try:
         yield
@@ -43,6 +49,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(conversations.router)
+    app.include_router(messages.router)
     app.include_router(admin.router)
     return app
 

@@ -80,6 +80,7 @@ class MessageOut(BaseModel):
     routing: RoutingOut | None = None
     rating: int | None = None
     error: str | None = None
+    status: str = "done"  # streaming | awaiting_approval | done | error
     created_at: datetime
 
 

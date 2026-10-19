@@ -37,4 +37,6 @@ def uuid_pk() -> Mapped[uuid.UUID]:
 
 
 def created_at_col() -> Mapped[datetime]:
-    return mapped_column(server_default=func.now())
+    # clock_timestamp(), not now(): now() is the transaction start, so rows created in one
+    # transaction (a user message and its answer placeholder) would tie and sort randomly.
+    return mapped_column(server_default=func.clock_timestamp())

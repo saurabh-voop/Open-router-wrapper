@@ -39,7 +39,7 @@ def upgrade() -> None:
     sa.Column('role', sa.String(length=16), nullable=False),
     sa.Column('monthly_cap_usd', sa.Numeric(precision=18, scale=10), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.CheckConstraint("role IN ('admin', 'member')", name=op.f('ck_users_role')),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_users')),
     sa.UniqueConstraint('email', name=op.f('uq_users_email'))
@@ -52,8 +52,8 @@ def upgrade() -> None:
     sa.Column('current_category', sa.String(length=50), nullable=True),
     sa.Column('locked_model', sa.String(length=200), nullable=True),
     sa.Column('confidential', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_conversations_user_id_users'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_conversations'))
     )
@@ -64,7 +64,7 @@ def upgrade() -> None:
     sa.Column('provider', sa.String(length=50), nullable=False),
     sa.Column('encrypted_refresh_token', sa.Text(), nullable=False),
     sa.Column('scopes', sa.Text(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_oauth_tokens_user_id_users'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_oauth_tokens')),
     sa.UniqueConstraint('user_id', 'provider', name=op.f('uq_oauth_tokens_user_id'))
@@ -89,7 +89,7 @@ def upgrade() -> None:
     sa.Column('cached_tokens', sa.Integer(), nullable=True),
     sa.Column('cost_usd', sa.Numeric(precision=18, scale=10), nullable=True),
     sa.Column('latency_ms', sa.Integer(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.CheckConstraint("role IN ('user', 'assistant', 'tool', 'system')", name=op.f('ck_messages_role')),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], name=op.f('fk_messages_conversation_id_conversations'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['parent_id'], ['messages.id'], name=op.f('fk_messages_parent_id_messages'), ondelete='CASCADE'),
@@ -109,7 +109,7 @@ def upgrade() -> None:
     sa.Column('sha256', sa.String(length=64), nullable=False),
     sa.Column('page_count', sa.Integer(), nullable=True),
     sa.Column('est_tokens', sa.Integer(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], name=op.f('fk_attachments_conversation_id_conversations'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['message_id'], ['messages.id'], name=op.f('fk_attachments_message_id_messages'), ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_attachments_user_id_users'), ondelete='CASCADE'),
@@ -125,7 +125,7 @@ def upgrade() -> None:
     sa.Column('user_id', sa.UUID(), nullable=False),
     sa.Column('rating', sa.SmallInteger(), nullable=False),
     sa.Column('comment', sa.Text(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.CheckConstraint('rating IN (-1, 1)', name=op.f('ck_feedback_rating')),
     sa.ForeignKeyConstraint(['message_id'], ['messages.id'], name=op.f('fk_feedback_message_id_messages'), ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], name=op.f('fk_feedback_user_id_users'), ondelete='CASCADE'),
@@ -148,7 +148,7 @@ def upgrade() -> None:
     sa.Column('classifier_latency_ms', sa.Integer(), nullable=True),
     sa.Column('overridden_to', sa.String(length=200), nullable=True),
     sa.Column('regenerated', sa.Boolean(), nullable=False),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.ForeignKeyConstraint(['message_id'], ['messages.id'], name=op.f('fk_routing_decisions_message_id_messages'), ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_routing_decisions'))
     )
@@ -163,7 +163,7 @@ def upgrade() -> None:
     sa.Column('status', sa.String(length=32), nullable=False),
     sa.Column('duration_ms', sa.Integer(), nullable=True),
     sa.Column('approved_by', sa.UUID(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('clock_timestamp()'), nullable=False),
     sa.CheckConstraint("status IN ('pending_approval', 'running', 'succeeded', 'failed', 'rejected')", name=op.f('ck_tool_runs_status')),
     sa.ForeignKeyConstraint(['approved_by'], ['users.id'], name=op.f('fk_tool_runs_approved_by_users')),
     sa.ForeignKeyConstraint(['message_id'], ['messages.id'], name=op.f('fk_tool_runs_message_id_messages'), ondelete='CASCADE'),

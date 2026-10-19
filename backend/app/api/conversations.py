@@ -159,8 +159,12 @@ async def thread_messages(
     ):
         runs_by_message.setdefault(r.message_id, []).append(ToolRunOut.model_validate(r))
 
-    out: list[MessageOut] = []
     turn_runs: dict[uuid.UUID, list[ToolRunOut]] = {}
+    for m in rows:
+        if m.role == "assistant":
+            turn_runs.setdefault(m.parent_id or m.id, []).extend(runs_by_message.get(m.id, []))
+
+    out: list[MessageOut] = []
     for m in rows:
         if m.role == "user":
             out.append(
@@ -179,19 +183,17 @@ async def thread_messages(
                 )
             )
             continue
-        if m.role != "assistant":
-            continue
+        if m.role != "assistant" or not m.content.get("final"):
+            continue  # tool-calling steps: their tool runs show on the turn's final answer
         key = m.parent_id or m.id
-        turn_runs.setdefault(key, []).extend(runs_by_message.get(m.id, []))
-        if not m.content.get("final"):
-            continue  # intermediate tool-calling step; its tool runs show on the final answer
         d = decisions.get(m.id)
         out.append(
             MessageOut(
                 id=m.id,
                 role="assistant",
                 parent_id=m.parent_id,
-                text=_text(m.content),
+                text="\n\n".join(m.content.get("display_parts") or []) or _text(m.content),
+                status=str(m.content.get("status") or "done"),
                 citations=list(m.content.get("citations") or []),
                 files=list(m.content.get("files") or []),
                 tool_runs=turn_runs.pop(key, []),

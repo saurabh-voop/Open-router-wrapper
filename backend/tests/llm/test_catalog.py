@@ -92,3 +92,40 @@ def test_shipped_routing_yaml_parses() -> None:
         "actions",
         "general",
     }
+
+
+@respx.mock
+async def test_classifier_without_structured_outputs_is_flagged(db: AsyncSession) -> None:
+    models = [
+        catalog_model("acme/fast-classifier", params=("tools",))
+        if m["id"] == "acme/fast-classifier"
+        else m
+        for m in FAKE_MODELS
+    ]
+    _mock(models, FAKE_ZDR)
+    client = OpenRouterClient("k", BASE_URL)
+    report = await sync_catalog(db, client, load_routing_config(FIXTURE))
+    await client.aclose()
+    assert any("structured output" in w for w in report.warnings)
+
+
+@respx.mock
+async def test_strict_startup_refuses_bad_routing(db: AsyncSession, monkeypatch: object) -> None:
+    import pytest
+
+    from app.core.config import get_settings
+    from app.llm import deps
+    from app.main import create_app, lifespan
+
+    _mock([m for m in FAKE_MODELS if m["id"] != "acme/coder"], FAKE_ZDR)
+    settings = get_settings()
+    original = (settings.catalog_sync_enabled, settings.routing_strict)
+    settings.catalog_sync_enabled, settings.routing_strict = True, True
+    deps.get_openrouter.cache_clear()
+    try:
+        with pytest.raises(RuntimeError, match="acme/coder"):
+            async with lifespan(create_app()):
+                pass
+    finally:
+        settings.catalog_sync_enabled, settings.routing_strict = original
+        deps.get_openrouter.cache_clear()

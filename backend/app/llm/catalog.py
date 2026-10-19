@@ -91,6 +91,11 @@ def routing_warnings(config: RoutingConfig, catalog: dict[str, CatalogModel]) ->
             warnings.append(f"{slug}: not in the OpenRouter catalog for this account")
         elif not row.has_zdr_endpoint:
             warnings.append(f"{slug}: has no zero-data-retention endpoint")
+    classifier = catalog.get(config.classifier_model)
+    if classifier is not None and not (
+        {"structured_outputs", "response_format"} & set(classifier.supported_parameters or [])
+    ):
+        warnings.append(f"{config.classifier_model}: classifier has no structured output support")
     return warnings
 
 
